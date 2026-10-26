@@ -50,7 +50,7 @@ class Renderer:
 
         # Stations are exactly 1 km apart in line_1.json.
         for station in line.stations:
-            x = int((float(station.get("position", 0)) - camera_x) * scale)
+            x = int((line.path.total_length - float(station.get("position", 0)) - camera_x) * scale)
             if -160 < x < width + 160:
                 pygame.draw.rect(surface, (75, 125, 145), (x - 60, track_y - 100, 120, 12), border_radius=3)
                 label = self.small_font.render(station.get("name", "Station"), True, (230, 234, 240))
@@ -61,27 +61,27 @@ class Renderer:
                     surface.blit(dlabel, (x - dlabel.get_width() // 2, track_y - 78))
 
         for signal in line.signals:
-            x = int((signal.position - camera_x) * scale)
+            x = int((line.path.total_length - signal.position - camera_x) * scale)
             if -20 < x < width + 20:
                 pygame.draw.rect(surface, (85, 88, 94), (x - 3, track_y - 65, 6, 48))
                 pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, track_y - 65), 7)
                 surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 8, track_y - 72))
 
         # Left-facing locomotive at the front; cars extend to its right.
-        loco_x = int((train.position - camera_x) * scale)
+        loco_x = int((line.path.total_length - train.position - train.loco_length_m - camera_x) * scale)
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
         loco = self._scaled_sprite(self.loco_image, loco_width)
         car = self._scaled_sprite(self.car_image, car_width)
         base_y = track_y - 15
         if loco is not None:
-            surface.blit(loco, (loco_x - loco.get_width(), base_y - loco.get_height()))
+            surface.blit(loco, (loco_x, base_y - loco.get_height()))
         else:
-            pygame.draw.rect(surface, (205, 210, 215), (loco_x - loco_width, base_y - 38, loco_width, 38), border_radius=5)
+            pygame.draw.rect(surface, (205, 210, 215), (loco_x, base_y - 38, loco_width, 38), border_radius=5)
         for wagon in train.wagons:
             if wagon.is_loco:
                 continue
-            car_x = loco_x + (wagon.index - 1) * car_width
+            car_x = loco_x + loco_width + (wagon.index - 1) * car_width
             if car is not None:
                 surface.blit(car, (car_x, base_y - car.get_height()))
             else:

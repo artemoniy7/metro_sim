@@ -1,0 +1,1 @@
+{"name":"Линия 2 — тестовый маршрут","color":[50,125,220],"points":[[0,350],[450,350],[900,330],[1400,350],[1900,350]],"stations":[{"id":"station_4","name":"Северная","position":400,"dwell_seconds":20},{"id":"station_5","name":"Речной вокзал","position":1050,"dwell_seconds":25}],"signals":[{"name":"S4","position":750,"aspect":"green"}]}

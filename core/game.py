@@ -8,15 +8,17 @@ from systems.loader import load_json
 from systems.renderer import Renderer
 from systems.input import InputController
 
+
 class Game:
     def __init__(self):
         self.renderer = Renderer()
         self.controls = InputController()
         self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
         self.line = Line(self.line_data)
-        train_data = load_json(DATA_DIR / "trains" / "81-717.json", default={})
+        # 81-760 is the playable train; its sprites live in assets/trains/81-760/.
+        train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.train = Train(train_data)
-        self.camera = Camera(WINDOW_SIZE)
+        self.camera = Camera(WINDOW_SIZE, zoom=0.5)
         self.elapsed = 0.0
 
     def handle_event(self, event):

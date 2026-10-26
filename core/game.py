@@ -18,7 +18,8 @@ class Game:
         # 81-760 is the playable train; its sprites live in assets/trains/81-760/.
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.train = Train(train_data)
-        self.camera = Camera(WINDOW_SIZE, zoom=0.5)
+        # Closer side-on camera: show the train large, not the whole route.
+        self.camera = Camera(WINDOW_SIZE, zoom=2.0)
         self.elapsed = 0.0
 
     def handle_event(self, event):

@@ -125,8 +125,12 @@ class Renderer:
         loco = self._scaled_sprite(self.loco_image, loco_width)
         target_height = loco.get_height() if loco is not None else 48
         car = self._scaled_sprite(self.car_image, car_width, target_height)
-        # Position the unwarped train at the track height under its front end.
-        base_y = rail_y_at(max(0, min(width - 1, loco_x)))
+        # Move the whole train vertically as one rigid object. Sample the track near
+        # the train's centre so the locomotive and every carriage keep the same y;
+        # no sprite is warped, rotated, or independently bent to match the slope.
+        car_count = sum(1 for wagon in train.wagons if not wagon.is_loco)
+        train_center_x = loco_x + (loco_width + car_count * car_width) // 2
+        base_y = rail_y_at(max(0, min(width - 1, train_center_x)))
         if loco is not None:
             surface.blit(loco, (loco_x, base_y - loco.get_height()))
         else:

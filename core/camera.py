@@ -1,12 +1,15 @@
-"""World-space camera following the left-facing leading cab; zoom 0.5 shows twice as much route."""
+"""Side-on camera that keeps the leading 81-760 cab in view."""
+
+
 class Camera:
-    def __init__(self, viewport, zoom=0.5):
+    def __init__(self, viewport, zoom=2.0):
         self.width, self.height = viewport
         self.zoom = max(0.1, float(zoom))
         self.x = 0.0
 
     @property
     def pixels_per_metre(self):
+        # At zoom 2, a 20 m locomotive is about 160 px wide.
         return 4.0 * self.zoom
 
     def follow(self, train, route_length):

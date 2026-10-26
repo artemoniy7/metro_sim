@@ -1,0 +1,1 @@
+{"aspects":{"red":{"stop":true,"speed_limit_kmh":0},"yellow":{"stop":false,"speed_limit_kmh":40},"green":{"stop":false,"speed_limit_kmh":80}},"als_ars":{"enabled":true,"default_speed_limit_kmh":60,"warning_margin_kmh":5,"emergency_brake":true}}

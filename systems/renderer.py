@@ -11,6 +11,7 @@ class Renderer:
         self.small_font = pygame.font.Font(None, 21)
         self.loco_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png")
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
+        self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
 
     @staticmethod
     def _load_sprite(path):
@@ -34,8 +35,20 @@ class Renderer:
         track_y = int(height * 0.79)
         camera_x = camera.x
 
-        # Dark tunnel wall above the track, with a floor/ballast strip below it.
-        pygame.draw.rect(surface, (25, 30, 39), (0, int(height * 0.14), width, track_y - int(height * 0.14)))
+        # Tunnel backdrop. Its real-world height is 5.5 m; preserve the source image's
+        # 1774:887 aspect ratio and tile it horizontally behind the train.
+        pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, track_y))
+        tunnel_height = max(1, round(5.5 * scale))
+        if self.tunnel_image is not None:
+            tunnel_width = max(1, round(tunnel_height * self.tunnel_image.get_width() / self.tunnel_image.get_height()))
+            tunnel_tile = pygame.transform.smoothscale(self.tunnel_image, (tunnel_width, tunnel_height))
+            tunnel_y = track_y - tunnel_height
+            # Offset the repeating texture with the world camera so it scrolls naturally.
+            offset = -int((camera_x * scale) % tunnel_width)
+            x = offset
+            while x < width:
+                surface.blit(tunnel_tile, (x, tunnel_y))
+                x += tunnel_width
         pygame.draw.rect(surface, (48, 51, 58), (0, track_y + 7, width, height - track_y - 7))
 
         # Side-on rail line and sleepers underneath the train, not over it.

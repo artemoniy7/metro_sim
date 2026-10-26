@@ -10,7 +10,7 @@ class Camera:
     @property
     def pixels_per_metre(self):
         # At zoom 2, a 20 m locomotive is about 160 px wide.
-        return 4.0 * self.zoom
+        return 10.0 * self.zoom
 
     def follow(self, train, route_length):
         # The sprite faces left, so the cab's world X decreases as route progress increases.

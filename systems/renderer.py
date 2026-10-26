@@ -28,68 +28,105 @@ class Renderer:
                   if target_height is None else max(1, int(target_height)))
         return pygame.transform.smoothscale(image, (max(1, width), height))
 
+    @staticmethod
+    def _track_offset(world_x):
+        """Gentle test-track rises and dips, measured in world metres."""
+        # Smooth, broad elevation changes; zero at the ends of each cycle.
+        import math
+        return (0.62 * math.sin(world_x / 34.0)
+                + 0.28 * math.sin(world_x / 13.5 + 0.8))
+
     def draw_scene(self, surface, line, train, camera, elapsed):
         width, height = surface.get_size()
         scale = camera.pixels_per_metre
-        # Side view: train sits above the rails; track is at the bottom of the scene.
-        track_y = int(height * 0.79)
+        base_track_y = int(height * 0.79)
         camera_x = camera.x
 
-        # Tunnel backdrop. Its real-world height is 5.5 m; preserve the source image's
-        # 1774:887 aspect ratio and tile it horizontally behind the train.
-        pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, track_y))
+        def rail_y_at(screen_x):
+            world_x = camera_x + screen_x / scale
+            return int(base_track_y - self._track_offset(world_x) * scale)
+
+        # Dark tunnel backdrop; its lower edge follows the test track's gentle slopes.
+        pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
         tunnel_height = max(1, round(5.5 * scale))
         if self.tunnel_image is not None:
             tunnel_width = max(1, round(tunnel_height * self.tunnel_image.get_width() / self.tunnel_image.get_height()))
             tunnel_tile = pygame.transform.smoothscale(self.tunnel_image, (tunnel_width, tunnel_height))
-            tunnel_y = track_y - tunnel_height
-            # Offset the repeating texture with the world camera so it scrolls naturally.
-            offset = -int((camera_x * scale) % tunnel_width)
-            x = offset
-            while x < width:
-                surface.blit(tunnel_tile, (x, tunnel_y))
-                x += tunnel_width
-        pygame.draw.rect(surface, (48, 51, 58), (0, track_y + 7, width, height - track_y - 7))
+            # Warp the tunnel into narrow vertical strips so its floor follows the slope.
+            strip_width = 4
+            for sx in range(0, width, strip_width):
+                world_x = camera_x + sx / scale
+                track_y = int(base_track_y - self._track_offset(world_x) * scale)
+                src_x = int((world_x * scale) % tunnel_width)
+                src_x = min(tunnel_width - 1, max(0, src_x))
+                slice_width = min(strip_width, tunnel_width - src_x)
+                if slice_width <= 0:
+                    continue
+                tunnel_slice = tunnel_tile.subsurface((src_x, 0, slice_width, tunnel_height))
+                surface.blit(tunnel_slice, (sx, track_y - tunnel_height))
+                # Fill any tiny gap caused by the repeating texture's wrap.
+                if slice_width < strip_width:
+                    extra = tunnel_tile.subsurface((0, 0, strip_width - slice_width, tunnel_height))
+                    surface.blit(extra, (sx + slice_width, track_y - tunnel_height))
+        # Fill the ground beneath the varying track line with short sloped strips.
+        for sx in range(0, width, 4):
+            y = rail_y_at(sx)
+            next_y = rail_y_at(min(width - 1, sx + 4))
+            pygame.draw.polygon(surface, (48, 51, 58),
+                                [(sx, y + 8), (min(width, sx + 4), next_y + 8),
+                                 (min(width, sx + 4), height), (sx, height)])
 
-        # Side-on rail line and sleepers underneath the train, not over it.
-        first_sleeper = int(camera_x / 2.5) * 2.5
+        # Sleepers and rails follow the uneven test track. The train itself stays unwarped.
+        sleeper_spacing = 2.5
+        first_sleeper = int(camera_x / sleeper_spacing) * sleeper_spacing
         sleeper = first_sleeper
         while sleeper < camera_x + width / scale:
             sx = int((sleeper - camera_x) * scale)
-            pygame.draw.line(surface, (95, 89, 80), (sx, track_y - 1), (sx, track_y + 14), 3)
-            sleeper += 2.5
-        pygame.draw.line(surface, (155, 160, 167), (0, track_y + 1), (width, track_y + 1), 4)
-        pygame.draw.line(surface, (85, 90, 98), (0, track_y + 7), (width, track_y + 7), 2)
+            if 0 <= sx < width:
+                sy = rail_y_at(sx)
+                pygame.draw.line(surface, (95, 89, 80), (sx, sy - 1), (sx, sy + 14), 3)
+            sleeper += sleeper_spacing
 
-        # Station markers/platform edge stay beside the track, at rail level.
+        # Draw the rails in short segments so their height follows the elevation profile.
+        rail_step = 4
+        for sx in range(0, width, rail_step):
+            ex = min(width, sx + rail_step)
+            y1 = rail_y_at(sx)
+            y2 = rail_y_at(min(width - 1, ex))
+            pygame.draw.line(surface, (155, 160, 167), (sx, y1 + 1), (ex, y2 + 1), 4)
+            pygame.draw.line(surface, (85, 90, 98), (sx, y1 + 7), (ex, y2 + 7), 2)
+
+        # Station platforms and labels sit at the local track height.
         for station in line.stations:
             x = int((line.path.total_length - float(station.get("position", 0)) - camera_x) * scale)
             if -160 < x < width + 160:
-                pygame.draw.line(surface, (75, 125, 145), (x - 90, track_y - 8), (x + 90, track_y - 8), 4)
+                sy = rail_y_at(max(0, min(width - 1, x)))
+                pygame.draw.line(surface, (75, 125, 145), (x - 90, sy - 8), (x + 90, sy - 8), 4)
                 label = self.small_font.render(station.get("name", "Station"), True, (230, 234, 240))
-                surface.blit(label, (x - label.get_width() // 2, track_y - 43))
+                surface.blit(label, (x - label.get_width() // 2, sy - 43))
                 distance = float(station.get("position", 0)) - train.position
                 if distance > 0:
                     dlabel = self.small_font.render(f"{distance:.0f} m", True, (170, 190, 205))
-                    surface.blit(dlabel, (x - dlabel.get_width() // 2, track_y - 25))
+                    surface.blit(dlabel, (x - dlabel.get_width() // 2, sy - 25))
 
-        # Signal posts stand at the side of the rail line.
+        # Signal posts follow the track slope; signal heads and labels move with them.
         for signal in line.signals:
             x = int((line.path.total_length - signal.position - camera_x) * scale)
             if -20 < x < width + 20:
-                pygame.draw.line(surface, (85, 88, 94), (x, track_y - 56), (x, track_y - 1), 5)
-                pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, track_y - 56), 8)
-                surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 10, track_y - 66))
+                sy = rail_y_at(max(0, min(width - 1, x)))
+                pygame.draw.line(surface, (85, 88, 94), (x, sy - 56), (x, sy - 1), 5)
+                pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, sy - 56), 8)
+                surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 10, sy - 66))
 
-        # Left-facing locomotive leads; the cars trail to its right. Wheels align with the rails.
+        # The train sprites are intentionally not warped; keep their original flat shape.
         loco_x = int((line.path.total_length - train.position - train.loco_length_m - camera_x) * scale)
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
         loco = self._scaled_sprite(self.loco_image, loco_width)
-        # Passenger cars use the same height as the locomotive, but remain 19 m long.
         target_height = loco.get_height() if loco is not None else 48
         car = self._scaled_sprite(self.car_image, car_width, target_height)
-        base_y = track_y
+        # Position the unwarped train at the track height under its front end.
+        base_y = rail_y_at(max(0, min(width - 1, loco_x)))
         if loco is not None:
             surface.blit(loco, (loco_x, base_y - loco.get_height()))
         else:
@@ -103,7 +140,7 @@ class Renderer:
             else:
                 pygame.draw.rect(surface, (185, 190, 196), (car_x, base_y - 48, car_width, 48), border_radius=4)
 
-        # Driving HUD.
+        # Driving HUD remains screen-space and is not affected by track elevation.
         pygame.draw.rect(surface, (12, 15, 20), (16, 16, 345, 137), border_radius=8)
         surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))

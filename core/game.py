@@ -30,7 +30,7 @@ class Game:
         self.elapsed += dt
         self.controls.update(self.train, dt)
         self.train.update(dt, self.line)
-        self.camera.follow(self.train)
+        self.camera.follow(self.train, self.line.path.total_length)
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)

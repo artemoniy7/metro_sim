@@ -1,6 +1,6 @@
 # Metro Sim
 
-A small Python/Pygame metro simulator scaffold. Configuration, train definitions, line layouts and signal rules live in JSON files under `data/`; game logic is split between `core/` and `systems/`.
+A small Python/Pygame metro driving simulator. The playable train is the 81-760 «Ока», using the sprites in `assets/trains/81-760/`.
 
 ## Run
 ```bash
@@ -9,9 +9,14 @@ python main.py
 ```
 
 ## Controls
-- **W / Up** — increase traction
-- **S / Down** — brake
+- **W / Up** — traction
+- **S / Down** — service brake
 - **Space** — emergency brake
 - **Esc** — quit
 
-The initial scene is a simple test route intended to be extended with station stops, signal aspects, ALS-ARS speed limits and train sprites.
+## Scale and route
+- World distances are in metres.
+- Stations on the test route are spaced 1,000 m apart.
+- The leading 81-760 cab is 20 m long; each following car is 19 m.
+- The camera uses 50% zoom (twice as far out as the previous view) and follows the leading cab.
+- Train textures are loaded from `assets/trains/81-760/81-760-loco.png` and `assets/trains/81-760/81-760-car.png`.

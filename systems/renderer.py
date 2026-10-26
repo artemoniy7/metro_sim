@@ -20,10 +20,11 @@ class Renderer:
             return None
 
     @staticmethod
-    def _scaled_sprite(image, width):
+    def _scaled_sprite(image, width, target_height=None):
         if image is None or image.get_width() <= 0:
             return None
-        height = max(1, round(width * image.get_height() / image.get_width()))
+        height = (max(1, round(width * image.get_height() / image.get_width()))
+                  if target_height is None else max(1, int(target_height)))
         return pygame.transform.smoothscale(image, (max(1, width), height))
 
     def draw_scene(self, surface, line, train, camera, elapsed):
@@ -72,7 +73,9 @@ class Renderer:
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
         loco = self._scaled_sprite(self.loco_image, loco_width)
-        car = self._scaled_sprite(self.car_image, car_width)
+        # Passenger cars use the same height as the locomotive, but remain 19 m long.
+        target_height = loco.get_height() if loco is not None else 48
+        car = self._scaled_sprite(self.car_image, car_width, target_height)
         base_y = track_y
         if loco is not None:
             surface.blit(loco, (loco_x, base_y - loco.get_height()))

@@ -39,6 +39,11 @@ class AudioSystem:
         self._engine_volumes = [0.0, 0.0, 0.0]
         self.brake_sounds = {}
         self.door_sound = None
+        self.station_announcements = []
+        self.station_announcement_index = 0
+        self.station_announcer_enabled = False
+        self.station_announcer_pending_start = False
+        self.station_announcement_channel = None
         self.brake_channel = None
         self.brake_channel_alt = None
         self._active_brake_channel = 0
@@ -84,6 +89,7 @@ class AudioSystem:
             # Keep both brake channels reserved from automatic joint-sound playback.
             self.brake_channel = pygame.mixer.Channel(6)
             self.brake_channel_alt = pygame.mixer.Channel(7)
+            self.station_announcement_channel = pygame.mixer.Channel(8)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -144,6 +150,64 @@ class AudioSystem:
         if self.door_sound is not None:
             self.door_sound.set_volume(1.0)
             self.door_sound.play()
+
+    def configure_station_announcements(self, station_count):
+        """Load the ordered next/current announcements for stations 2 onward."""
+        self.station_announcements = []
+        if pygame.mixer.get_init() is None:
+            return
+
+        station_dir = ASSETS_DIR / "stations" / "line_9"
+        for station_number in range(2, int(station_count) + 1):
+            names = []
+            if station_number < int(station_count):
+                names.append(f"st_{station_number:02d}_next.mp3")
+            names.append(f"st_{station_number:02d}_cur.mp3")
+            for filename in names:
+                path = station_dir / filename
+                if not path.is_file():
+                    continue
+                try:
+                    self.station_announcements.append(pygame.mixer.Sound(str(path)))
+                except (pygame.error, OSError):
+                    continue
+        self.station_announcement_index = 0
+
+    def toggle_station_announcer(self, train):
+        """Toggle the station announcer; at the first station, wait for departure."""
+        self.station_announcer_enabled = not self.station_announcer_enabled
+        if not self.station_announcer_enabled:
+            self.station_announcer_pending_start = False
+            if self.station_announcement_channel is not None:
+                self.station_announcement_channel.stop()
+            return
+
+        self.station_announcement_index = 0
+        if self.station_announcement_channel is None:
+            self.station_announcer_enabled = False
+            return
+        self.station_announcement_channel.stop()
+        self.station_announcer_pending_start = float(getattr(train, "position", 0.0)) <= 1.0
+
+    def update_station_announcer(self, train):
+        """Play each available announcement in sequence without overlapping clips."""
+        channel = self.station_announcement_channel
+        if not self.station_announcer_enabled or channel is None:
+            return
+        if self.station_announcer_pending_start:
+            if float(getattr(train, "position", 0.0)) <= 1.0:
+                return
+            self.station_announcer_pending_start = False
+        if channel.get_busy():
+            return
+
+        while self.station_announcement_index < len(self.station_announcements):
+            sound = self.station_announcements[self.station_announcement_index]
+            self.station_announcement_index += 1
+            channel.set_volume(1.0)
+            channel.play(sound)
+            return
+        # Keep the announcer enabled at the end; pressing I again restarts it.
 
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""

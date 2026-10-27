@@ -140,8 +140,9 @@ class AudioSystem:
             self.sounds = {}
 
     def play_door_sound(self):
-        """Play the available door sound for either opening or closing."""
+        """Play the door sound at full volume for opening or closing."""
         if self.door_sound is not None:
+            self.door_sound.set_volume(1.0)
             self.door_sound.play()
 
     def _update_brakes(self, train, dt):

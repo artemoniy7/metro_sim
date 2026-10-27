@@ -63,7 +63,6 @@ class AudioSystem:
             engine_dir = rolling_dir / "engine"
             for filename in (
                 "engine_rusich.wav",
-                "async.wav",
                 "engine_loud_new2_clean.wav",
                 "engine_loud_new2_clean_high.wav",
             ):
@@ -287,8 +286,7 @@ class AudioSystem:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
         speed_weights = (
             max(0.0, 1.0 - speed_kmh / 22.0),
-            max(0.0, min(1.0, (45.0 - speed_kmh) / (45.0 - 25.0))),
-            self._fade_in(speed_kmh, 10.0, 25.0)
+            self._fade_in(speed_kmh, 8.0, 22.0)
             * (1.0 - self._fade_in(speed_kmh, 45.0, 58.0)),
             self._fade_in(speed_kmh, 35.0, 55.0),
         )

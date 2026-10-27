@@ -14,6 +14,8 @@ class Renderer:
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
         self.vehicle_angles = {}
         self.last_render_time = None
+        # Cache tunnel tiles so they are not rescaled on every frame.
+        self._tunnel_tile_cache = {}
 
     @staticmethod
     def _load_sprite(path):
@@ -84,7 +86,10 @@ class Renderer:
         tunnel_height = max(1, round(5.5 * scale))
         if self.tunnel_image is not None:
             tunnel_width = max(1, round(tunnel_height * self.tunnel_image.get_width() / self.tunnel_image.get_height()))
-            tunnel_tile = pygame.transform.smoothscale(self.tunnel_image, (tunnel_width, tunnel_height))
+            tunnel_key = (id(self.tunnel_image), tunnel_width, tunnel_height)
+            if tunnel_key not in self._tunnel_tile_cache:
+                self._tunnel_tile_cache = {tunnel_key: pygame.transform.smoothscale(self.tunnel_image, (tunnel_width, tunnel_height))}
+            tunnel_tile = self._tunnel_tile_cache[tunnel_key]
             strip_width = 4
             for sx in range(0, width, strip_width):
                 world_x = camera_x + sx / scale
@@ -179,6 +184,10 @@ class Renderer:
             vehicle_image = self.loco_image if wagon.is_loco else self.car_image
             if wagon.is_loco and wagon.index == len(train.wagons) - 1 and vehicle_image is not None:
                 vehicle_image = pygame.transform.flip(vehicle_image, True, False)
+            # Skip off-screen wagons before doing expensive sprite scaling and rotation.
+            if vehicle_x + vehicle_width < -loco_width or vehicle_x > width + loco_width:
+                vehicle_x += vehicle_width
+                continue
             if vehicle_image is not None:
                 if wagon.is_loco:
                     src_w, src_h = vehicle_image.get_size()

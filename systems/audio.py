@@ -12,6 +12,7 @@ class AudioSystem:
     REFERENCE_SPEED_MPS = 12.0
     SOUND_FULL_VOLUME_DISTANCE_M = 12.0
     SOUND_CUTOFF_DISTANCE_M = 85.0
+    ROLLING_MAX_VOLUME = 0.38
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -24,12 +25,27 @@ class AudioSystem:
         self._groups = []
         self._loco_image_width = 2048
         self._car_image_width = 2048
+        self.rolling_sounds = []
+        self.rolling_channels = []
 
         try:
             if pygame.mixer.get_init() is None:
                 pygame.mixer.init()
 
-            sound_dir = ASSETS_DIR / "sounds" / "train" / "81-760" / "joint"
+            rolling_dir = ASSETS_DIR / "sounds" / "train" / "81-760"
+            for filename in ("rolling_low.wav", "rolling_50.wav", "rolling_70.wav"):
+                try:
+                    self.rolling_sounds.append(pygame.mixer.Sound(str(rolling_dir / filename)))
+                except (pygame.error, OSError):
+                    self.rolling_sounds.append(None)
+
+            # Reserve dedicated channels so the continuous rolling loops do not
+            # interrupt short rail-joint effects.
+            pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
+            pygame.mixer.set_reserved(3)
+            self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
+
+            sound_dir = rolling_dir / "joint"
             pattern = re.compile(r"joint_st_(\d{2})_([12])\.(?:wav|mp3)$", re.IGNORECASE)
             for path in sorted(sound_dir.iterdir()):
                 match = pattern.fullmatch(path.name)
@@ -104,7 +120,36 @@ class AudioSystem:
             if group is not None:
                 self._play(group, 2, speed, distance_m)
 
+    @staticmethod
+    def _fade_in(speed_kmh, start, end):
+        return max(0.0, min(1.0, (speed_kmh - start) / (end - start)))
+
+    def _update_rolling(self, speed_mps):
+        speed_kmh = speed_mps * 3.6
+        # Small overlap zones provide smooth crossfades around 50 and 70 km/h.
+        volumes = (
+            self._fade_in(speed_kmh, 30.0, 35.0)
+            * (1.0 - self._fade_in(speed_kmh, 45.0, 55.0)),
+            self._fade_in(speed_kmh, 45.0, 55.0)
+            * (1.0 - self._fade_in(speed_kmh, 65.0, 75.0)),
+            self._fade_in(speed_kmh, 65.0, 75.0),
+        )
+        for sound, channel, weight in zip(
+            self.rolling_sounds, self.rolling_channels, volumes
+        ):
+            if sound is None:
+                continue
+            if weight <= 0.0:
+                if channel.get_busy():
+                    channel.stop()
+                continue
+            channel.set_volume(self.ROLLING_MAX_VOLUME * weight)
+            if not channel.get_busy():
+                channel.play(sound, loops=-1)
+
     def update(self, train, dt, camera=None):
+        speed = abs(train.speed)
+        self._update_rolling(speed)
         if not self.sounds:
             return
 
@@ -115,7 +160,6 @@ class AudioSystem:
 
         previous_position = self._last_position
         self._last_position = position
-        speed = abs(train.speed)
         if position <= previous_position:
             return
 

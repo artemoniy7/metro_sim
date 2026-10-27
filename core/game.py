@@ -17,6 +17,9 @@ class Game:
         self.audio = AudioSystem()
         self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
         self.line = Line(self.line_data)
+        configure_announcements = getattr(self.audio, "configure_station_announcements", None)
+        if callable(configure_announcements):
+            configure_announcements(len(self.line.stations))
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.train = Train(train_data)
         # Close view of the locomotive, with mouse-wheel zoom and consist panning.
@@ -32,6 +35,10 @@ class Game:
             play_door_sound = getattr(self.audio, "play_door_sound", None)
             if callable(play_door_sound):
                 play_door_sound()
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+            toggle_announcer = getattr(self.audio, "toggle_station_announcer", None)
+            if callable(toggle_announcer):
+                toggle_announcer(self.train)
         elif event.type == pygame.MOUSEWHEEL:
             self.camera.zoom_by(event.y * 0.15)
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -52,6 +59,9 @@ class Game:
         self.train.update(dt, self.line)
         self.camera.follow(self.train, self.line.path.total_length)
         self.audio.update(self.train, dt, self.camera)
+        update_announcer = getattr(self.audio, "update_station_announcer", None)
+        if callable(update_announcer):
+            update_announcer(self.train)
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)

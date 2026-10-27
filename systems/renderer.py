@@ -74,14 +74,32 @@ class Renderer:
         def rail_y_at(screen_x):
             world_x = camera_x + screen_x / scale
             route_position = max(0.0, min(line.path.total_length, line.path.total_length - world_x))
-            station = next((item for item in line.stations
-                            if abs(route_position - float(item.get("position", 0)))
-                            <= float(item.get("length_m", 162)) / 2), None)
-            if station is not None:
-                depth_m = float(station.get("depth_m", line.path.point_at(route_position)[1]))
-                return round(base_track_y + (depth_m - 10.0) * 1.35)
-            depth_m = line.path.point_at(route_position)[1]
-            return round(base_track_y + (depth_m - 10.0) * 1.35 - self._track_offset(world_x) * scale)
+            path_depth = line.path.point_at(route_position)[1]
+            depth_m = path_depth
+            offset_weight = 1.0
+
+            # Platforms are level, but their elevation must blend into the
+            # tunnel gradually. Otherwise the procedural track offset and the
+            # route profile create a visible kink right at the station exit.
+            transition_m = 180.0
+            for item in line.stations:
+                center = float(item.get("position", 0))
+                half_length = float(item.get("length_m", 162)) / 2.0
+                distance = abs(route_position - center)
+                station_depth = float(item.get("depth_m", path_depth))
+                if distance <= half_length:
+                    depth_m = station_depth
+                    offset_weight = 0.0
+                    break
+                if distance < half_length + transition_m:
+                    t = (distance - half_length) / transition_m
+                    blend = t * t * (3.0 - 2.0 * t)
+                    depth_m = station_depth * (1.0 - blend) + path_depth * blend
+                    offset_weight = blend
+                    break
+
+            return round(base_track_y + (depth_m - 10.0) * 1.35
+                         - self._track_offset(world_x) * scale * offset_weight)
 
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
         tunnel_height = max(1, round(5.5 * scale))

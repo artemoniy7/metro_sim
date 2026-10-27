@@ -29,6 +29,9 @@ class Train:
         self.speed = 0.0
         self.emergency_brake_active = False
         self.acceleration_state = 0.0
+        self.brake_applied = False
+        self._brake_command_timer = 0.0
+        self.BRAKE_RESPONSE_DELAY_S = 1.0
         self.als = AlsArs()
 
     @property
@@ -51,10 +54,18 @@ class Train:
         dt = min(dt, 0.1)
         limit = self.als.speed_limit(line, self.position, self.max_speed)
 
-        if self.emergency_brake_active:
+        # The train takes one second to react to a brake command.
+        brake_commanded = self.emergency_brake_active or self.controller_notch < 0
+        if brake_commanded:
+            self._brake_command_timer += dt
+        else:
+            self._brake_command_timer = 0.0
+        self.brake_applied = brake_commanded and self._brake_command_timer >= self.BRAKE_RESPONSE_DELAY_S
+
+        if self.emergency_brake_active and self.brake_applied:
             self.speed = max(0.0, self.speed - self.emergency_brake * dt)
             self.acceleration_state = 0.0
-        elif self.controller_notch < 0:
+        elif self.controller_notch < 0 and self.brake_applied:
             # T1 is gentle braking; T3 applies the strongest service braking.
             index = min(len(self.brake_notches) - 1, abs(self.controller_notch) - 1)
             deceleration = self.brake_notches[index]

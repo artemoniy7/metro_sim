@@ -64,7 +64,7 @@ class Renderer:
             frame_dt = max(0.0, min(0.1, elapsed - self.last_render_time))
         self.last_render_time = elapsed
         target_door_amount = 1.0 if doors_open else 0.0
-        door_step = frame_dt / 0.45
+        door_step = frame_dt / 4.0
         if self.door_open_amount < target_door_amount:
             self.door_open_amount = min(target_door_amount, self.door_open_amount + door_step)
         else:

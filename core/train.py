@@ -62,15 +62,23 @@ class Train:
             self._brake_command_timer = 0.0
         self.brake_applied = brake_commanded and self._brake_command_timer >= self.BRAKE_RESPONSE_DELAY_S
 
-        if self.emergency_brake_active and self.brake_applied:
-            self.speed = max(0.0, self.speed - self.emergency_brake * dt)
-            self.acceleration_state = 0.0
-        elif self.controller_notch < 0 and self.brake_applied:
-            # T1 is gentle braking; T3 applies the strongest service braking.
-            index = min(len(self.brake_notches) - 1, abs(self.controller_notch) - 1)
-            deceleration = self.brake_notches[index]
-            self.speed = max(0.0, self.speed - deceleration * dt)
-            self.acceleration_state = 0.0
+        if self.brake_applied:
+            if self.emergency_brake_active:
+                deceleration = self.emergency_brake
+            else:
+                # T1 is gentle braking; T3 applies the strongest service braking.
+                index = min(len(self.brake_notches) - 1, abs(self.controller_notch) - 1)
+                deceleration = self.brake_notches[index]
+
+            # Ramp braking force in gradually instead of changing speed abruptly.
+            target_acceleration = -deceleration
+            change = self.jerk_limit * dt
+            self.acceleration_state += max(
+                -change, min(change, target_acceleration - self.acceleration_state)
+            )
+            self.speed = max(0.0, self.speed + self.acceleration_state * dt)
+            if self.speed <= 0.0:
+                self.acceleration_state = 0.0
         else:
             # Supervision brakes automatically if the train exceeds its permitted speed.
             if self.speed > limit:
@@ -81,6 +89,11 @@ class Train:
                 if self.controller_notch > 0:
                     index = min(len(self.traction_notches) - 1, self.controller_notch - 1)
                     target_acceleration = self.traction_notches[index]
+                    # Traction weakens as speed rises, so the train accelerates
+                    # more strongly at low speed and more gently near 80 km/h.
+                    speed_kmh = self.speed * 3.6
+                    high_speed_fade = max(0.0, min(1.0, (speed_kmh - 40.0) / 40.0))
+                    target_acceleration *= 1.0 - 0.45 * high_speed_fade
                 if self.speed >= limit:
                     target_acceleration = min(0.0, target_acceleration)
                 change = self.jerk_limit * dt

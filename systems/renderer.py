@@ -86,15 +86,38 @@ class Renderer:
             strip_width = 4
             for sx in range(0, width, strip_width):
                 world_x = camera_x + sx / scale
+                route_position = line.path.total_length - world_x
                 track_y = round(base_track_y - self._track_offset(world_x) * scale)
-                src_x = int((world_x * scale) % tunnel_width)
-                src_x = min(tunnel_width - 1, max(0, src_x))
-                slice_width = min(strip_width, tunnel_width - src_x)
-                if slice_width > 0:
-                    surface.blit(tunnel_tile.subsurface((src_x, 0, slice_width, tunnel_height)), (sx, track_y - tunnel_height))
-                    if slice_width < strip_width:
-                        extra_width = min(strip_width - slice_width, tunnel_width)
-                        surface.blit(tunnel_tile.subsurface((0, 0, extra_width, tunnel_height)), (sx + slice_width, track_y - tunnel_height))
+                at_station = any(
+                    abs(route_position - float(station.get("position", 0)))
+                    <= float(station.get("length_m", 155)) / 2
+                    for station in line.stations
+                )
+                if at_station:
+                    # Stations use the requested red wall/background instead of tunnel texture.
+                    pygame.draw.rect(surface, (142, 24, 34),
+                                     (sx, track_y - tunnel_height, strip_width, tunnel_height + 20))
+                    if int(route_position) % 24 < 4:
+                        pygame.draw.line(surface, (105, 20, 29),
+                                         (sx, track_y - tunnel_height), (sx, track_y + 12), 2)
+                else:
+                    src_x = int((world_x * scale) % tunnel_width)
+                    src_x = min(tunnel_width - 1, max(0, src_x))
+                    slice_width = min(strip_width, tunnel_width - src_x)
+                    if slice_width > 0:
+                        surface.blit(tunnel_tile.subsurface((src_x, 0, slice_width, tunnel_height)), (sx, track_y - tunnel_height))
+                        if slice_width < strip_width:
+                            extra_width = min(strip_width - slice_width, tunnel_width)
+                            surface.blit(tunnel_tile.subsurface((0, 0, extra_width, tunnel_height)), (sx + slice_width, track_y - tunnel_height))
+        else:
+            # Keep the tunnel dark, but still paint red station sections without an asset.
+            for sx in range(0, width, 4):
+                route_position = line.path.total_length - (camera_x + sx / scale)
+                if any(abs(route_position - float(station.get("position", 0)))
+                       <= float(station.get("length_m", 155)) / 2 for station in line.stations):
+                    track_y = round(base_track_y - self._track_offset(camera_x + sx / scale) * scale)
+                    pygame.draw.rect(surface, (142, 24, 34),
+                                     (sx, track_y - tunnel_height, 4, tunnel_height + 20))
 
         for sx in range(0, width, 4):
             ex = min(width, sx + 4)
@@ -139,47 +162,54 @@ class Renderer:
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
-        loco = self._scaled_sprite(self.loco_image, loco_width)
-        loco_height = loco.get_height() if loco is not None else 48
+        loco_height = (self._scaled_sprite(self.loco_image, loco_width).get_height()
+                       if self._scaled_sprite(self.loco_image, loco_width) is not None else 48)
         car = self._scaled_sprite(self.car_image, car_width, loco_height)
+        loco_src_w, loco_src_h = self.loco_image.get_size() if self.loco_image is not None else (1, 1)
+        left_ratio, right_ratio = 499 / loco_src_w, 1902 / loco_src_w
+        axle_y_ratio = 464 / loco_src_h
 
-        if loco is not None:
-            src_w, src_h = self.loco_image.get_size()
-            left_ratio, right_ratio = 499 / src_w, 1902 / src_w
-            axle_y_ratio = 464 / src_h
-            left_x = loco_x + left_ratio * loco_width
-            right_x = loco_x + right_ratio * loco_width
-            left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
-            self._draw_train_sprite(surface, self.loco_image, loco_width, loco_height,
-                                    left_ratio, right_ratio, axle_y_ratio,
-                                    left_x, right_x, left_y, right_y, "loco", frame_dt)
-        else:
-            left_x = loco_x + loco_width * (499 / 1902)
-            left_y = rail_y_at(left_x)
-            right_x, right_y = loco_x + loco_width, rail_y_at(loco_x + loco_width)
-            pygame.draw.polygon(surface, (205, 210, 215),
-                                [(loco_x, left_y - 48), (loco_x + loco_width, right_y - 48),
-                                 (loco_x + loco_width, right_y), (loco_x, left_y)])
-
+        # Eight vehicles: leading cab, six passenger cars, and a reversed cab at the rear.
+        vehicle_x = loco_x
         for wagon in train.wagons:
-            if wagon.is_loco:
-                continue
-            car_x = loco_x + loco_width + (wagon.index - 1) * car_width
-            if car is not None:
-                src_w, src_h = self.car_image.get_size()
-                left_ratio, right_ratio = 334 / src_w, 1898 / src_w
-                axle_y_ratio = 435 / src_h
-                left_x, right_x = car_x + left_ratio * car_width, car_x + right_ratio * car_width
-                left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
-                self._draw_train_sprite(surface, self.car_image, car_width, loco_height,
-                                        left_ratio, right_ratio, axle_y_ratio,
-                                        left_x, right_x, left_y, right_y,
-                                        f"wagon_{wagon.index}", frame_dt)
+            vehicle_width = loco_width if wagon.is_loco else car_width
+            vehicle_image = self.loco_image if wagon.is_loco else self.car_image
+            if wagon.is_loco and wagon.index == len(train.wagons) - 1 and vehicle_image is not None:
+                vehicle_image = pygame.transform.flip(vehicle_image, True, False)
+            if vehicle_image is not None:
+                if wagon.is_loco:
+                    src_w, src_h = vehicle_image.get_size()
+                    if wagon.index == len(train.wagons) - 1:
+                        vehicle_left_ratio, vehicle_right_ratio = 1 - right_ratio, 1 - left_ratio
+                    else:
+                        vehicle_left_ratio, vehicle_right_ratio = left_ratio, right_ratio
+                    left_x = vehicle_x + vehicle_left_ratio * vehicle_width
+                    right_x = vehicle_x + vehicle_right_ratio * vehicle_width
+                    left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
+                    self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
+                                            vehicle_left_ratio, vehicle_right_ratio,
+                                            axle_y_ratio, left_x, right_x, left_y, right_y,
+                                            f"loco_{wagon.index}", frame_dt)
+                else:
+                    car_sprite = self._scaled_sprite(vehicle_image, vehicle_width, loco_height)
+                    if car_sprite is not None:
+                        src_w, src_h = self.car_image.get_size()
+                        left_ratio_car, right_ratio_car = 334 / src_w, 1898 / src_w
+                        left_x = vehicle_x + left_ratio_car * vehicle_width
+                        right_x = vehicle_x + right_ratio_car * vehicle_width
+                        left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
+                        self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
+                                                left_ratio_car, right_ratio_car, 435 / src_h,
+                                                left_x, right_x, left_y, right_y,
+                                                f"wagon_{wagon.index}", frame_dt)
             else:
-                left_y, right_y = rail_y_at(car_x), rail_y_at(car_x + car_width)
-                pygame.draw.polygon(surface, (185, 190, 196),
-                                    [(car_x, left_y - 48), (car_x + car_width, right_y - 48),
-                                     (car_x + car_width, right_y), (car_x, left_y)])
+                left_y, right_y = rail_y_at(vehicle_x), rail_y_at(vehicle_x + vehicle_width)
+                pygame.draw.polygon(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196),
+                                    [(vehicle_x, left_y - 48),
+                                     (vehicle_x + vehicle_width, right_y - 48),
+                                     (vehicle_x + vehicle_width, right_y),
+                                     (vehicle_x, left_y)])
+            vehicle_x += vehicle_width
 
         # Driving HUD remains fixed to the screen.
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
@@ -190,4 +220,12 @@ class Renderer:
         lever_color = (255, 180, 95) if train.controller_notch < 0 else (110, 220, 160)
         surface.blit(self.font.render(f"Ручка: {train.controller_label}", True, lever_color), (30, 115))
         surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 147))
+        next_station = next((station for station in line.stations
+                             if float(station.get("position", 0)) > train.position), None)
+        if next_station is not None:
+            next_distance = max(0.0, float(next_station["position"]) - train.position)
+            next_text = f"До {next_station['name']}: {next_distance / 1000:.2f} км"
+        else:
+            next_text = "Конечная станция"
+        surface.blit(self.small_font.render(next_text, True, (230, 150, 155)), (465, 25))
         surface.blit(self.small_font.render("A/← тормоз   D/→ тяга   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 173))

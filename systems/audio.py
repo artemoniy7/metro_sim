@@ -15,8 +15,9 @@ class AudioSystem:
     ROLLING_MAX_VOLUME = 0.38
     ENGINE_MAX_VOLUME = 0.48
     BRAKE_VOLUME = 0.62
-    BRAKE_NEAR_STOP_SPEED_KMH = 4.0
+    BRAKE_NEAR_STOP_SPEED_KMH = 8.0
     BRAKE_SOUND_MIN_SPEED_KMH = 2.0
+    BRAKE_REPEAT_INTERVAL_S = 1.25
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -40,6 +41,7 @@ class AudioSystem:
         self._was_braking = False
         self._played_near_stop = False
         self._last_brake_notch = 0
+        self._brake_repeat_timer = 0.0
 
         try:
             if pygame.mixer.get_init() is None:
@@ -126,8 +128,8 @@ class AudioSystem:
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
 
-    def _update_brakes(self, train):
-        """Play a brake squeal on brake application and a longer squeal near a stop."""
+    def _update_brakes(self, train, dt):
+        """Repeat brake squeals during braking and play the long squeal before stopping."""
         speed_kmh = abs(train.speed) * 3.6
         braking = train.emergency_brake_active or train.controller_notch < 0
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
@@ -136,30 +138,33 @@ class AudioSystem:
             self._was_braking = False
             self._played_near_stop = False
             self._last_brake_notch = 0
+            self._brake_repeat_timer = 0.0
             return
 
-        if not self._was_braking:
-            # T1, T2 and T3 have progressively stronger and louder brake sounds.
-            sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
+        sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
+        # Play immediately when braking begins, and whenever the brake notch changes.
+        if not self._was_braking or brake_notch != self._last_brake_notch:
             sound = self.brake_sounds.get(sound_key)
             if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
                 sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
                 self.brake_channel.play(sound)
-            self._was_braking = True
+            self._brake_repeat_timer = 0.0
             self._last_brake_notch = brake_notch
+        else:
+            # A squeal is a short effect, so repeat it while the train is still braking.
+            self._brake_repeat_timer += max(0.0, dt)
+            if self._brake_repeat_timer >= self.BRAKE_REPEAT_INTERVAL_S:
+                sound = self.brake_sounds.get(sound_key)
+                if sound is not None and speed_kmh > self.BRAKE_NEAR_STOP_SPEED_KMH:
+                    sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
+                    self.brake_channel.play(sound)
+                self._brake_repeat_timer = 0.0
 
-        # If the driver increases braking while already braking, reflect the new notch
-        # with a short squeal, but avoid replaying it every frame.
-        elif brake_notch != self._last_brake_notch:
-            sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
-            sound = self.brake_sounds.get(sound_key)
-            if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
-                sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
-                self.brake_channel.play(sound)
-            self._last_brake_notch = brake_notch
+        self._was_braking = True
 
-        # The longer, louder squeal is only triggered once, close to standstill.
-        if (not self._played_near_stop and self.BRAKE_SOUND_MIN_SPEED_KMH < speed_kmh <= self.BRAKE_NEAR_STOP_SPEED_KMH):
+        # Start the longer, louder squeal earlier, before the train reaches a standstill.
+        if (not self._played_near_stop
+                and self.BRAKE_SOUND_MIN_SPEED_KMH < speed_kmh <= self.BRAKE_NEAR_STOP_SPEED_KMH):
             key = random.choice(("near_stop_a", "near_stop_b"))
             sound = self.brake_sounds.get(key)
             if sound is not None:
@@ -276,7 +281,7 @@ class AudioSystem:
         speed = abs(train.speed)
         self._update_rolling(speed)
         self._update_engine(train, dt)
-        self._update_brakes(train)
+        self._update_brakes(train, dt)
         if not self.sounds:
             return
 

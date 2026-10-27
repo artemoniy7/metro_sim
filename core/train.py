@@ -96,12 +96,12 @@ class Train:
                 target_acceleration = natural_acceleration
                 if self.controller_notch > 0:
                     index = min(len(self.traction_notches) - 1, self.controller_notch - 1)
-                    target_acceleration += self.traction_notches[index]
-                    # Traction weakens as speed rises, so the train accelerates
-                    # more strongly at low speed and more gently near 80 km/h.
+                    traction_acceleration = self.traction_notches[index]
+                    # Traction weakens as speed rises, but grade and resistance stay active.
                     speed_kmh = self.speed * 3.6
                     high_speed_fade = max(0.0, min(1.0, (speed_kmh - 40.0) / 40.0))
-                    target_acceleration *= 1.0 - 0.45 * high_speed_fade
+                    traction_acceleration *= 1.0 - 0.45 * high_speed_fade
+                    target_acceleration += traction_acceleration
                 if self.speed >= limit:
                     target_acceleration = min(0.0, target_acceleration)
                 change = self.jerk_limit * dt

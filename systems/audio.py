@@ -76,8 +76,9 @@ class AudioSystem:
             pygame.mixer.set_reserved(8)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
-            self.brake_channel = pygame.mixer.Channel(7)
-            self.brake_channel_alt = pygame.mixer.Channel(8)
+            # Keep both brake channels reserved from automatic joint-sound playback.
+            self.brake_channel = pygame.mixer.Channel(6)
+            self.brake_channel_alt = pygame.mixer.Channel(7)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -167,9 +168,8 @@ class AudioSystem:
                 next_channel = channels[next_index]
                 current_channel = channels[self._active_brake_channel]
                 next_channel.stop()
-                next_channel.set_volume(0.0)
-                next_channel.play(sound, fade_ms=350)
                 next_channel.set_volume(target_volume)
+                next_channel.play(sound, fade_ms=350)
                 if current_channel.get_busy():
                     current_channel.fadeout(350)
                 self._active_brake_channel = next_index
@@ -209,9 +209,8 @@ class AudioSystem:
                 next_channel = channels[next_index]
                 current_channel = channels[self._active_brake_channel]
                 next_channel.stop()
-                next_channel.set_volume(0.0)
-                next_channel.play(sound, fade_ms=350)
                 next_channel.set_volume(min(1.0, self.BRAKE_VOLUME * 1.45))
+                next_channel.play(sound, fade_ms=350)
                 if current_channel.get_busy():
                     current_channel.fadeout(350)
                 self._active_brake_channel = next_index

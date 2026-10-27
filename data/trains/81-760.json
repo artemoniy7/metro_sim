@@ -2,7 +2,7 @@
   "name": "81-760",
   "display_name": "Ока",
   "wagons": 6,
-  "max_speed_kmh": 90,
+  "max_speed_kmh": 80,
   "acceleration_mps2": 0.9,
   "brake_mps2": 1.15,
   "emergency_brake_mps2": 1.5,

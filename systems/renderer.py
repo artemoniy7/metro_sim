@@ -12,7 +12,6 @@ class Renderer:
         self.loco_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png")
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
-        # Keep a separate, smoothed pitch angle for each car to avoid visual jolts.
         self.vehicle_angles = {}
         self.last_render_time = None
 
@@ -35,7 +34,6 @@ class Renderer:
     def _track_offset(world_x):
         """Smooth, shallow test-track rises and dips, measured in world metres."""
         import math
-        # Long wavelengths and modest amplitudes avoid abrupt-looking changes.
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
@@ -46,26 +44,19 @@ class Renderer:
         import math
         if image is None:
             return
-
-        sprite = pygame.transform.smoothscale(
-            image, (max(1, scaled_width), max(1, scaled_height))
-        )
+        sprite = pygame.transform.smoothscale(image, (max(1, scaled_width), max(1, scaled_height)))
         dx = right_x - left_x
         dy = right_y - left_y
         target_angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
         previous_angle = self.vehicle_angles.get(vehicle_key, target_angle)
-        # Interpolate the angle along the shortest path, independently for every car.
         angle_delta = (target_angle - previous_angle + 180.0) % 360.0 - 180.0
         smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
         angle = previous_angle + angle_delta * smoothing
         self.vehicle_angles[vehicle_key] = angle
         rotated = pygame.transform.rotozoom(sprite, angle, 1.0)
-
-        # Axle midpoint in source-sprite coordinates, relative to its centre.
         source_mid_x = ((left_axle_ratio + right_axle_ratio) / 2.0 - 0.5) * scaled_width
         source_mid_y = (axle_y_ratio - 0.5) * scaled_height
         rotated_offset = pygame.math.Vector2(source_mid_x, source_mid_y).rotate(angle)
-
         target_mid_x = (left_x + right_x) / 2.0
         target_mid_y = (left_y + right_y) / 2.0
         draw_x = round(target_mid_x - rotated_offset.x - rotated.get_width() / 2.0)
@@ -84,11 +75,9 @@ class Renderer:
         camera_x = camera.x
 
         def rail_y_at(screen_x):
-            # Keep sub-pixel precision for rotation angles; round only when drawing.
             world_x = camera_x + screen_x / scale
             return base_track_y - self._track_offset(world_x) * scale
 
-        # Tunnel image follows the changing track height, while preserving its texture.
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
         tunnel_height = max(1, round(5.5 * scale))
         if self.tunnel_image is not None:
@@ -110,10 +99,8 @@ class Renderer:
         for sx in range(0, width, 4):
             ex = min(width, sx + 4)
             y1, y2 = rail_y_at(sx), rail_y_at(min(width - 1, ex))
-            pygame.draw.polygon(surface, (48, 51, 58),
-                                [(sx, y1 + 8), (ex, y2 + 8), (ex, height), (sx, height)])
+            pygame.draw.polygon(surface, (48, 51, 58), [(sx, y1 + 8), (ex, y2 + 8), (ex, height), (sx, height)])
 
-        # Track sleepers and rails follow the elevation profile.
         sleeper_spacing = 2.5
         sleeper = int(camera_x / sleeper_spacing) * sleeper_spacing
         while sleeper < camera_x + width / scale:
@@ -149,8 +136,6 @@ class Renderer:
                 pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, sy - 56), 8)
                 surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 10, sy - 66))
 
-        # Place each vehicle by its real axle points. The axle midpoint is anchored
-        # directly to the smooth rail profile, so the train cannot sink below the track.
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
@@ -164,18 +149,14 @@ class Renderer:
             axle_y_ratio = 464 / src_h
             left_x = loco_x + left_ratio * loco_width
             right_x = loco_x + right_ratio * loco_width
-            left_y = rail_y_at(left_x)
-            right_y = rail_y_at(right_x)
-            self._draw_train_sprite(
-                surface, self.loco_image, loco_width, loco_height,
-                left_ratio, right_ratio, axle_y_ratio,
-                left_x, right_x, left_y, right_y, "loco", frame_dt
-            )
+            left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
+            self._draw_train_sprite(surface, self.loco_image, loco_width, loco_height,
+                                    left_ratio, right_ratio, axle_y_ratio,
+                                    left_x, right_x, left_y, right_y, "loco", frame_dt)
         else:
             left_x = loco_x + loco_width * (499 / 1902)
             left_y = rail_y_at(left_x)
-            right_x = loco_x + loco_width
-            right_y = rail_y_at(right_x)
+            right_x, right_y = loco_x + loco_width, rail_y_at(loco_x + loco_width)
             pygame.draw.polygon(surface, (205, 210, 215),
                                 [(loco_x, left_y - 48), (loco_x + loco_width, right_y - 48),
                                  (loco_x + loco_width, right_y), (loco_x, left_y)])
@@ -188,27 +169,25 @@ class Renderer:
                 src_w, src_h = self.car_image.get_size()
                 left_ratio, right_ratio = 334 / src_w, 1898 / src_w
                 axle_y_ratio = 435 / src_h
-                left_x = car_x + left_ratio * car_width
-                right_x = car_x + right_ratio * car_width
-                left_y = rail_y_at(left_x)
-                right_y = rail_y_at(right_x)
-                self._draw_train_sprite(
-                    surface, self.car_image, car_width, loco_height,
-                    left_ratio, right_ratio, axle_y_ratio,
-                    left_x, right_x, left_y, right_y, f"wagon_{wagon.index}", frame_dt
-                )
+                left_x, right_x = car_x + left_ratio * car_width, car_x + right_ratio * car_width
+                left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
+                self._draw_train_sprite(surface, self.car_image, car_width, loco_height,
+                                        left_ratio, right_ratio, axle_y_ratio,
+                                        left_x, right_x, left_y, right_y,
+                                        f"wagon_{wagon.index}", frame_dt)
             else:
-                left_y = rail_y_at(car_x)
-                right_y = rail_y_at(car_x + car_width)
+                left_y, right_y = rail_y_at(car_x), rail_y_at(car_x + car_width)
                 pygame.draw.polygon(surface, (185, 190, 196),
                                     [(car_x, left_y - 48), (car_x + car_width, right_y - 48),
                                      (car_x + car_width, right_y), (car_x, left_y)])
 
         # Driving HUD remains fixed to the screen.
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
-        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 390, 165), border_radius=8)
-        surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
+        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 430, 190), border_radius=8)
+        surface.blit(self.font.render(f"81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
         surface.blit(self.small_font.render(f"Ограничение: {speed_limit_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
-        surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 115))
-        surface.blit(self.small_font.render("W/↑ тяга   S/↓ тормоз   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 143))
+        lever_color = (255, 180, 95) if train.controller_notch < 0 else (110, 220, 160)
+        surface.blit(self.font.render(f"Ручка: {train.controller_label}", True, lever_color), (30, 115))
+        surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 147))
+        surface.blit(self.small_font.render("A/← тормоз   D/→ тяга   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 173))

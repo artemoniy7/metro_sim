@@ -13,7 +13,7 @@ class Renderer:
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
-        self.vehicle_angles = {};
+        self.vehicle_angles = {}
         self._station_tile_cache = {}
         self.last_render_time = None
         # Cache tunnel tiles so they are not rescaled on every frame.
@@ -93,6 +93,17 @@ class Renderer:
         def rail_y_at(screen_x):
             world_x = camera_x + screen_x / scale
             route_position = max(0.0, min(line.path.total_length, line.path.total_length - world_x))
+
+            # Keep the track perfectly straight through each station.
+            station = next((
+                item for item in line.stations
+                if abs(route_position - float(item.get("position", 0)))
+                <= float(item.get("length_m", 162)) / 2
+            ), None)
+            if station is not None:
+                depth_m = float(station.get("depth_m", line.path.point_at(route_position)[1]))
+                return round(base_track_y + (depth_m - 10.0) * 1.35)
+
             depth_m = line.path.point_at(route_position)[1]
             return round(base_track_y + (depth_m - 10.0) * 1.35 - self._track_offset(world_x) * scale)
 
@@ -111,13 +122,13 @@ class Renderer:
                 track_y = rail_y_at(sx)
                 at_station = any(
                     abs(route_position - float(station.get("position", 0)))
-                    <= float(station.get("length_m", 155)) / 2
+                    <= float(station.get("length_m", 162)) / 2
                     for station in line.stations
                 )
                 if at_station:
                     # Repeat the station photo along the platform, with a taller ceiling
                     # than the regular tunnel so the station feels more spacious.
-                    station_height = max(tunnel_height + 1, round(8.5 * scale))
+                    station_height = max(1, round(8.5 * scale))
                     station_bottom_extra = max(1, round(0.25 * scale))
                     if self.station_image is not None:
                         station_width = max(1, round(
@@ -130,7 +141,10 @@ class Renderer:
                                     self.station_image, (station_width, station_height))
                             }
                         station_tile = self._station_tile_cache[station_key]
-                        tile_x = int((world_x * scale) % station_width)
+                        # Anchor the texture phase in world metres, not screen pixels.
+                        # This prevents the photo from sliding when the camera zoom changes.
+                        tile_world_width = station_width / scale
+                        tile_x = int(((world_x % tile_world_width) / tile_world_width) * station_width)
                         src_x = min(station_width - 1, max(0, tile_x))
                         slice_width = min(strip_width, station_width - src_x)
                         if slice_width > 0:

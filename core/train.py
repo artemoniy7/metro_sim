@@ -33,7 +33,7 @@ class Train:
         self.acceleration_state = 0.0
         self.brake_applied = False
         self._brake_command_timer = 0.0
-        self.BRAKE_RESPONSE_DELAY_S = 1.0
+        self.BRAKE_RESPONSE_DELAY_S = float(data.get("brake_response_delay_s", 0.0))
         # Small rolling/air resistance: noticeable over time, but not a hard brake.
         self.rolling_resistance = 0.012  # m/s² at low speed
         self.speed_resistance = 0.00025  # additional m/s² per m/s

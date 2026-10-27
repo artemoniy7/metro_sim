@@ -1,18 +1,372 @@
 {
-  "name": "Линия 1 — тестовый маршрут",
-  "color": [220, 45, 55],
-  "points": [[0, 350], [1000, 350], [2000, 350], [3000, 350], [4000, 350], [5000, 350]],
+  "name": "Серпуховско-Тимирязевская линия (9, серая)",
+  "line_number": 9,
+  "color": [
+    145,
+    148,
+    155
+  ],
+  "total_length_m": 41470,
+  "station_length_m": 155,
+  "points": [
+    [
+      0,
+      9
+    ],
+    [
+      2089,
+      9.5
+    ],
+    [
+      4804,
+      9
+    ],
+    [
+      6266,
+      10.5
+    ],
+    [
+      8146,
+      61
+    ],
+    [
+      10025,
+      63.5
+    ],
+    [
+      11488,
+      59
+    ],
+    [
+      13472,
+      52
+    ],
+    [
+      15143,
+      48.5
+    ],
+    [
+      16396,
+      50
+    ],
+    [
+      17858,
+      62
+    ],
+    [
+      19529,
+      46.5
+    ],
+    [
+      20886,
+      36.5
+    ],
+    [
+      22244,
+      43
+    ],
+    [
+      24124,
+      9.5
+    ],
+    [
+      26421,
+      13.5
+    ],
+    [
+      28197,
+      9
+    ],
+    [
+      29763,
+      9.5
+    ],
+    [
+      31121,
+      13
+    ],
+    [
+      33001,
+      10.5
+    ],
+    [
+      34880,
+      10
+    ],
+    [
+      36029,
+      9.5
+    ],
+    [
+      38327,
+      8
+    ],
+    [
+      39590,
+      8
+    ],
+    [
+      41470,
+      10
+    ]
+  ],
   "stations": [
-    {"id": "station_1", "name": "Парк", "position": 1000, "dwell_seconds": 20},
-    {"id": "station_2", "name": "Центральная", "position": 2000, "dwell_seconds": 25},
-    {"id": "station_3", "name": "Университет", "position": 3000, "dwell_seconds": 20},
-    {"id": "station_4", "name": "Депо", "position": 4000, "dwell_seconds": 20}
+    {
+      "id": "station_01",
+      "name": "Алтуфьево",
+      "position": 0,
+      "depth_m": 9,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_02",
+      "name": "Бибирево",
+      "position": 2089,
+      "depth_m": 9.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_03",
+      "name": "Отрадное",
+      "position": 4804,
+      "depth_m": 9,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_04",
+      "name": "Владыкино",
+      "position": 6266,
+      "depth_m": 10.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_05",
+      "name": "Петровско-Разумовская",
+      "position": 8146,
+      "depth_m": 61,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_06",
+      "name": "Тимирязевская",
+      "position": 10025,
+      "depth_m": 63.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_07",
+      "name": "Дмитровская",
+      "position": 11488,
+      "depth_m": 59,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_08",
+      "name": "Савёловская",
+      "position": 13472,
+      "depth_m": 52,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_09",
+      "name": "Менделеевская",
+      "position": 15143,
+      "depth_m": 48.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_10",
+      "name": "Цветной бульвар",
+      "position": 16396,
+      "depth_m": 50,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_11",
+      "name": "Чеховская",
+      "position": 17858,
+      "depth_m": 62,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_12",
+      "name": "Боровицкая",
+      "position": 19529,
+      "depth_m": 46.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_13",
+      "name": "Полянка",
+      "position": 20886,
+      "depth_m": 36.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_14",
+      "name": "Серпуховская",
+      "position": 22244,
+      "depth_m": 43,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_15",
+      "name": "Тульская",
+      "position": 24124,
+      "depth_m": 9.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_16",
+      "name": "Нагатинская",
+      "position": 26421,
+      "depth_m": 13.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_17",
+      "name": "Нагорная",
+      "position": 28197,
+      "depth_m": 9,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_18",
+      "name": "Нахимовский проспект",
+      "position": 29763,
+      "depth_m": 9.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_19",
+      "name": "Севастопольская",
+      "position": 31121,
+      "depth_m": 13,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_20",
+      "name": "Чертановская",
+      "position": 33001,
+      "depth_m": 10.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_21",
+      "name": "Южная",
+      "position": 34880,
+      "depth_m": 10,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_22",
+      "name": "Пражская",
+      "position": 36029,
+      "depth_m": 9.5,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_23",
+      "name": "Улица Академика Янгеля",
+      "position": 38327,
+      "depth_m": 8,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_24",
+      "name": "Аннино",
+      "position": 39590,
+      "depth_m": 8,
+      "length_m": 155,
+      "dwell_seconds": 20
+    },
+    {
+      "id": "station_25",
+      "name": "Бульвар Дмитрия Донского",
+      "position": 41470,
+      "depth_m": 10,
+      "length_m": 155,
+      "dwell_seconds": 20
+    }
   ],
   "signals": [
-    {"name": "S1", "position": 700, "aspect": "green"},
-    {"name": "S2", "position": 1700, "aspect": "green"},
-    {"name": "S3", "position": 2700, "aspect": "yellow"},
-    {"name": "S4", "position": 3700, "aspect": "green"},
-    {"name": "S5", "position": 4700, "aspect": "green"}
+    {
+      "name": "S1",
+      "position": 700,
+      "aspect": "green"
+    },
+    {
+      "name": "S2",
+      "position": 3500,
+      "aspect": "green"
+    },
+    {
+      "name": "S3",
+      "position": 7000,
+      "aspect": "green"
+    },
+    {
+      "name": "S4",
+      "position": 11000,
+      "aspect": "green"
+    },
+    {
+      "name": "S5",
+      "position": 15000,
+      "aspect": "yellow"
+    },
+    {
+      "name": "S6",
+      "position": 19000,
+      "aspect": "green"
+    },
+    {
+      "name": "S7",
+      "position": 23000,
+      "aspect": "green"
+    },
+    {
+      "name": "S8",
+      "position": 27000,
+      "aspect": "green"
+    },
+    {
+      "name": "S9",
+      "position": 31000,
+      "aspect": "green"
+    },
+    {
+      "name": "S10",
+      "position": 35000,
+      "aspect": "green"
+    },
+    {
+      "name": "S11",
+      "position": 39000,
+      "aspect": "green"
+    }
   ]
 }

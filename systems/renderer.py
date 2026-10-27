@@ -19,7 +19,6 @@ class Renderer:
         self.vehicle_angles = {}
         self._station_tile_cache = {}
         self.last_render_time = None
-        # Cache tunnel tiles so they are not rescaled on every frame.
         self._tunnel_tile_cache = {}
 
     @staticmethod
@@ -36,7 +35,6 @@ class Renderer:
         height = (max(1, round(width * image.get_height() / image.get_width()))
                   if target_height is None else max(1, int(target_height)))
         size = (max(1, width), height)
-        # Reuse scaled sprites while zoom and target dimensions stay unchanged.
         cache = Renderer.__dict__.get("_sprite_scale_cache")
         if cache is None:
             cache = {}
@@ -67,7 +65,7 @@ class Renderer:
         door_step = frame_dt / 4.0
         if self.door_open_amount < target_door_amount:
             self.door_open_amount = min(target_door_amount, self.door_open_amount + door_step)
-        else:
+        elif self.door_open_amount > target_door_amount:
             self.door_open_amount = max(target_door_amount, self.door_open_amount - door_step)
         scale = camera.pixels_per_metre
         base_track_y = int(height * 0.79)
@@ -76,17 +74,12 @@ class Renderer:
         def rail_y_at(screen_x):
             world_x = camera_x + screen_x / scale
             route_position = max(0.0, min(line.path.total_length, line.path.total_length - world_x))
-
-            # Keep the track perfectly straight through each station.
-            station = next((
-                item for item in line.stations
-                if abs(route_position - float(item.get("position", 0)))
-                <= float(item.get("length_m", 162)) / 2
-            ), None)
+            station = next((item for item in line.stations
+                            if abs(route_position - float(item.get("position", 0)))
+                            <= float(item.get("length_m", 162)) / 2), None)
             if station is not None:
                 depth_m = float(station.get("depth_m", line.path.point_at(route_position)[1]))
                 return round(base_track_y + (depth_m - 10.0) * 1.35)
-
             depth_m = line.path.point_at(route_position)[1]
             return round(base_track_y + (depth_m - 10.0) * 1.35 - self._track_offset(world_x) * scale)
 
@@ -103,46 +96,28 @@ class Renderer:
                 world_x = camera_x + sx / scale
                 route_position = line.path.total_length - world_x
                 track_y = rail_y_at(sx)
-                at_station = any(
-                    abs(route_position - float(station.get("position", 0)))
-                    <= float(station.get("length_m", 162)) / 2
-                    for station in line.stations
-                )
+                at_station = any(abs(route_position - float(station.get("position", 0)))
+                                 <= float(station.get("length_m", 162)) / 2 for station in line.stations)
                 if at_station:
-                    # Repeat the station photo along the platform, with a taller ceiling
-                    # than the regular tunnel so the station feels more spacious.
                     station_height = max(1, round(8.5 * scale))
                     station_bottom_extra = max(1, round(0.25 * scale))
                     if self.station_image is not None:
-                        station_width = max(1, round(
-                            station_height * self.station_image.get_width()
-                            / self.station_image.get_height()))
+                        station_width = max(1, round(station_height * self.station_image.get_width() / self.station_image.get_height()))
                         station_key = (id(self.station_image), station_width, station_height)
                         if station_key not in self._station_tile_cache:
-                            self._station_tile_cache = {
-                                station_key: pygame.transform.smoothscale(
-                                    self.station_image, (station_width, station_height))
-                            }
+                            self._station_tile_cache = {station_key: pygame.transform.smoothscale(self.station_image, (station_width, station_height))}
                         station_tile = self._station_tile_cache[station_key]
-                        # Anchor the texture phase in world metres, not screen pixels.
-                        # This prevents the photo from sliding when the camera zoom changes.
                         tile_world_width = station_width / scale
                         tile_x = int(((world_x % tile_world_width) / tile_world_width) * station_width)
                         src_x = min(station_width - 1, max(0, tile_x))
                         slice_width = min(strip_width, station_width - src_x)
                         if slice_width > 0:
-                            surface.blit(
-                                station_tile.subsurface((src_x, 0, slice_width, station_height)),
-                                (sx, track_y - station_height + station_bottom_extra))
+                            surface.blit(station_tile.subsurface((src_x, 0, slice_width, station_height)), (sx, track_y - station_height + station_bottom_extra))
                         if slice_width < strip_width:
                             extra_width = min(strip_width - slice_width, station_width)
-                            surface.blit(
-                                station_tile.subsurface((0, 0, extra_width, station_height)),
-                                (sx + slice_width, track_y - station_height + station_bottom_extra))
+                            surface.blit(station_tile.subsurface((0, 0, extra_width, station_height)), (sx + slice_width, track_y - station_height + station_bottom_extra))
                     else:
-                        pygame.draw.rect(surface, (142, 24, 34),
-                                         (sx, track_y - station_height, strip_width,
-                                          station_height + 20))
+                        pygame.draw.rect(surface, (142, 24, 34), (sx, track_y - station_height, strip_width, station_height + 20))
                 else:
                     src_x = int((world_x * scale) % tunnel_width)
                     src_x = min(tunnel_width - 1, max(0, src_x))
@@ -153,14 +128,11 @@ class Renderer:
                             extra_width = min(strip_width - slice_width, tunnel_width)
                             surface.blit(tunnel_tile.subsurface((0, 0, extra_width, tunnel_height)), (sx + slice_width, track_y - tunnel_height))
         else:
-            # Keep the tunnel dark, but still paint red station sections without an asset.
             for sx in range(0, width, 4):
                 route_position = line.path.total_length - (camera_x + sx / scale)
-                if any(abs(route_position - float(station.get("position", 0)))
-                       <= float(station.get("length_m", 155)) / 2 for station in line.stations):
+                if any(abs(route_position - float(station.get("position", 0))) <= float(station.get("length_m", 155)) / 2 for station in line.stations):
                     track_y = rail_y_at(sx)
-                    pygame.draw.rect(surface, (142, 24, 34),
-                                     (sx, track_y - tunnel_height, 4, tunnel_height + 20))
+                    pygame.draw.rect(surface, (142, 24, 34), (sx, track_y - tunnel_height, 4, tunnel_height + 20))
 
         for sx in range(0, width, 4):
             ex = min(width, sx + 4)
@@ -206,13 +178,8 @@ class Renderer:
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
-
-        loco_height = (self._scaled_sprite(self.loco_image, loco_width).get_height()
-                       if self._scaled_sprite(self.loco_image, loco_width) is not None else 48)
-
-        # Draw the consist using fixed world-space car slots. Do not independently
-        # anchor each sprite to wheel pixels: that made transparent margins and
-        # rotated bounding boxes create zoom-dependent gaps between vehicles.
+        loco_scaled = self._scaled_sprite(self.loco_image, loco_width)
+        loco_height = loco_scaled.get_height() if loco_scaled is not None else 48
         vehicle_x = loco_x
         for wagon in train.wagons:
             vehicle_width = loco_width if wagon.is_loco else car_width
@@ -220,57 +187,38 @@ class Renderer:
             is_rear_cab = wagon.is_loco and wagon.index == len(train.wagons) - 1
             if is_rear_cab and vehicle_image is not None:
                 vehicle_image = pygame.transform.flip(vehicle_image, True, False)
-
             if vehicle_x + vehicle_width >= -loco_width and vehicle_x <= width + loco_width:
                 if vehicle_image is not None:
-                    sprite = pygame.transform.smoothscale(
-                        vehicle_image, (max(1, vehicle_width), max(1, loco_height)))
+                    sprite = pygame.transform.smoothscale(vehicle_image, (max(1, vehicle_width), max(1, loco_height)))
                     if wagon.is_loco and wagon.index == 0 and self.door_left_image is not None and self.door_right_image is not None:
                         source_width, source_height = vehicle_image.get_size()
                         sx = vehicle_width / source_width
                         sy = loco_height / source_height
-                        openings = ((373, 81, 553, 322), (939, 81, 1119, 322),
-                                    (1433, 81, 1613, 322), (1897, 81, 2077, 322))
+                        openings = ((373, 81, 553, 322), (939, 81, 1119, 322), (1433, 81, 1613, 322), (1897, 81, 2077, 322))
                         for x1, y1, x2, y2 in openings:
-                            left_door = pygame.transform.smoothscale(
-                                self.door_left_image, (max(1, round(91 * sx)),
-                                                       max(1, round(243 * sy))))
-                            right_door = pygame.transform.smoothscale(
-                                self.door_right_image, (max(1, round(90 * sx)),
-                                                        max(1, round(243 * sy))))
-                            amount = self.door_open_amount if doors_open else 0.0
-                            sprite.blit(left_door, (
-                                round(x1 * sx - left_door.get_width() * amount),
-                                round(y1 * sy)))
-                            sprite.blit(right_door, (
-                                round((x2 - 90) * sx + right_door.get_width() * amount),
-                                round(y1 * sy)))
-
-                    # One shared track height for adjacent cars keeps their bodies
-                    # connected; the track's visual bumps must not move cars apart.
+                            left_door = pygame.transform.smoothscale(self.door_left_image, (max(1, round(91 * sx)), max(1, round(243 * sy))))
+                            right_door = pygame.transform.smoothscale(self.door_right_image, (max(1, round(90 * sx)), max(1, round(243 * sy))))
+                            amount = self.door_open_amount
+                            sprite.blit(left_door, (round(x1 * sx - left_door.get_width() * amount), round(y1 * sy)))
+                            sprite.blit(right_door, (round((x2 - 90) * sx + right_door.get_width() * amount), round(y1 * sy)))
                     center_x = vehicle_x + vehicle_width / 2
                     center_y = rail_y_at(center_x)
-                    draw_y = round(center_y - loco_height + 4)
-                    surface.blit(sprite, (round(vehicle_x), draw_y))
+                    surface.blit(sprite, (round(vehicle_x), round(center_y - loco_height + 4)))
                 else:
                     center_x = vehicle_x + vehicle_width / 2
                     center_y = rail_y_at(center_x)
-                    pygame.draw.rect(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196),
-                                     (round(vehicle_x), round(center_y - 48 + 4),
-                                      vehicle_width, 48))
+                    pygame.draw.rect(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196), (round(vehicle_x), round(center_y - 48 + 4), vehicle_width, 48))
             vehicle_x += vehicle_width
 
-        # Driving HUD remains fixed to the screen.
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
         pygame.draw.rect(surface, (12, 15, 20), (16, 16, 430, 190), border_radius=8)
-        surface.blit(self.font.render(f"81-760 «Ока»", True, (240, 240, 240)), (30, 25))
+        surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
         surface.blit(self.small_font.render(f"Ограничение: {speed_limit_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
         lever_color = (255, 180, 95) if train.controller_notch < 0 else (110, 220, 160)
         surface.blit(self.font.render(f"Ручка: {train.controller_label}", True, lever_color), (30, 115))
         surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 147))
-        next_station = next((station for station in line.stations
-                             if float(station.get("position", 0)) > train.position), None)
+        next_station = next((station for station in line.stations if float(station.get("position", 0)) > train.position), None)
         if next_station is not None:
             next_distance = max(0.0, float(next_station["position"]) - train.position)
             next_text = f"До {next_station['name']}: {next_distance / 1000:.2f} км"

@@ -1,21 +1,23 @@
-"""Keyboard input mapping."""
+"""Keyboard input for the notched traction/brake controller."""
 import pygame
+
 
 class InputController:
     def __init__(self):
         self.emergency = False
 
     def handle_event(self, event, train):
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-            self.emergency = True
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                self.emergency = True
+            elif event.key in (pygame.K_a, pygame.K_LEFT):
+                # Move the lever one position toward braking, down to T3.
+                train.controller_notch = max(-3, train.controller_notch - 1)
+            elif event.key in (pygame.K_d, pygame.K_RIGHT):
+                # Move the lever one position toward traction, up to G4.
+                train.controller_notch = min(4, train.controller_notch + 1)
         elif event.type == pygame.KEYUP and event.key == pygame.K_SPACE:
             self.emergency = False
 
     def update(self, train, dt):
-        keys = pygame.key.get_pressed()
-        train.throttle = 1.0 if keys[pygame.K_w] or keys[pygame.K_UP] else 0.0
-        train.brake = 1.0 if keys[pygame.K_s] or keys[pygame.K_DOWN] else 0.0
         train.emergency_brake_active = self.emergency
-        if self.emergency:
-            train.brake = 1.0
-            train.throttle = 0.0

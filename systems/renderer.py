@@ -14,6 +14,7 @@ class Renderer:
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
         # Keep a separate, smoothed pitch angle for each car to avoid visual jolts.
         self.vehicle_angles = {}
+        self.last_render_time = None
 
     @staticmethod
     def _load_sprite(path):
@@ -38,10 +39,9 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    @staticmethod
-    def _draw_train_sprite(surface, image, scaled_width, scaled_height,
+    def _draw_train_sprite(self, surface, image, scaled_width, scaled_height,
                            left_axle_ratio, right_axle_ratio, axle_y_ratio,
-                           left_x, right_x, left_y, right_y):
+                           left_x, right_x, left_y, right_y, vehicle_key, frame_dt):
         """Rotate a scaled train sprite and anchor its axle midpoint to the rails."""
         import math
         if image is None:
@@ -53,9 +53,12 @@ class Renderer:
         dx = right_x - left_x
         dy = right_y - left_y
         target_angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
-        vehicle_key = getattr(image, "_vehicle_key", None)
-        # The caller supplies per-vehicle identity via an optional temporary attribute below.
-        angle = target_angle
+        previous_angle = self.vehicle_angles.get(vehicle_key, target_angle)
+        # Interpolate the angle along the shortest path, independently for every car.
+        angle_delta = (target_angle - previous_angle + 180.0) % 360.0 - 180.0
+        smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
+        angle = previous_angle + angle_delta * smoothing
+        self.vehicle_angles[vehicle_key] = angle
         rotated = pygame.transform.rotozoom(sprite, angle, 1.0)
 
         # Axle midpoint in source-sprite coordinates, relative to its centre.
@@ -71,6 +74,11 @@ class Renderer:
 
     def draw_scene(self, surface, line, train, camera, elapsed):
         width, height = surface.get_size()
+        if self.last_render_time is None:
+            frame_dt = 1.0 / 60.0
+        else:
+            frame_dt = max(0.0, min(0.1, elapsed - self.last_render_time))
+        self.last_render_time = elapsed
         scale = camera.pixels_per_metre
         base_track_y = int(height * 0.79)
         camera_x = camera.x
@@ -161,7 +169,7 @@ class Renderer:
             self._draw_train_sprite(
                 surface, self.loco_image, loco_width, loco_height,
                 left_ratio, right_ratio, axle_y_ratio,
-                left_x, right_x, left_y, right_y
+                left_x, right_x, left_y, right_y, "loco", frame_dt
             )
         else:
             left_x = loco_x + loco_width * (499 / 1902)
@@ -187,7 +195,7 @@ class Renderer:
                 self._draw_train_sprite(
                     surface, self.car_image, car_width, loco_height,
                     left_ratio, right_ratio, axle_y_ratio,
-                    left_x, right_x, left_y, right_y
+                    left_x, right_x, left_y, right_y, f"wagon_{wagon.index}", frame_dt
                 )
             else:
                 left_y = rail_y_at(car_x)
@@ -197,8 +205,10 @@ class Renderer:
                                      (car_x + car_width, right_y), (car_x, left_y)])
 
         # Driving HUD remains fixed to the screen.
-        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 345, 137), border_radius=8)
+        speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
+        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 390, 165), border_radius=8)
         surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
-        surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 89))
-        surface.blit(self.small_font.render("W/↑ тяга   S/↓ тормоз   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 119))
+        surface.blit(self.small_font.render(f"Ограничение: {speed_limit_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
+        surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 115))
+        surface.blit(self.small_font.render("W/↑ тяга   S/↓ тормоз   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 143))

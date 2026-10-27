@@ -8,8 +8,10 @@ from settings import ASSETS_DIR
 
 
 class AudioSystem:
-    JOINT_SPACING_M = 25.0
+    JOINT_SPACING_M = 50.0
     REFERENCE_SPEED_MPS = 12.0
+    SOUND_FULL_VOLUME_DISTANCE_M = 12.0
+    SOUND_CUTOFF_DISTANCE_M = 85.0
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -41,10 +43,11 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     continue
 
-            self._groups = sorted({group for group, hit in self.sounds if hit == 1 and (group, 2) in self.sounds})
+            self._groups = sorted({
+                group for group, hit in self.sounds
+                if hit == 1 and (group, 2) in self.sounds
+            })
 
-            # Use the actual sprite dimensions so the wheel coordinates match
-            # the points drawn by Renderer, even if the source image changes.
             loco_path = ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png"
             car_path = ASSETS_DIR / "trains" / "81-760" / "81-760-car.png"
             try:
@@ -59,11 +62,15 @@ class AudioSystem:
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
 
-    def _play(self, group, hit, speed):
+    def _play(self, group, hit, speed, distance_m):
         sound = self.sounds.get((group, hit))
-        if sound is None or speed < 0.5:
+        if sound is None or speed < 0.5 or distance_m >= self.SOUND_CUTOFF_DISTANCE_M:
             return
-        sound.set_volume(max(0.08, min(0.65, 0.55 * speed / self.REFERENCE_SPEED_MPS)))
+        speed_volume = max(0.08, min(0.65, 0.55 * speed / self.REFERENCE_SPEED_MPS))
+        distance_volume = 1.0 - max(0.0, distance_m - self.SOUND_FULL_VOLUME_DISTANCE_M) / (
+            self.SOUND_CUTOFF_DISTANCE_M - self.SOUND_FULL_VOLUME_DISTANCE_M
+        )
+        sound.set_volume(max(0.0, min(0.65, speed_volume * distance_volume)))
         sound.play()
 
     @staticmethod
@@ -76,8 +83,8 @@ class AudioSystem:
         for joint_index in range(first, last + 1):
             yield joint_index
 
-    def _process_pair(self, pair_key, offsets, previous_position, position, speed):
-        # The smaller offset reaches a track joint first as the train moves.
+    def _process_pair(self, pair_key, offsets, previous_position, position,
+                      speed, distance_m):
         ordered_offsets = sorted(offsets)
         first_offset, second_offset = ordered_offsets
         previous_first = previous_position + first_offset
@@ -90,14 +97,14 @@ class AudioSystem:
                 return
             group = random.choice(self._groups)
             self._pair_sequences[(pair_key, joint_index)] = group
-            self._play(group, 1, speed)
+            self._play(group, 1, speed, distance_m)
 
         for joint_index in self._crossed_joints(previous_second, current_second):
             group = self._pair_sequences.pop((pair_key, joint_index), None)
             if group is not None:
-                self._play(group, 2, speed)
+                self._play(group, 2, speed, distance_m)
 
-    def update(self, train, dt):
+    def update(self, train, dt, camera=None):
         if not self.sounds:
             return
 
@@ -112,18 +119,16 @@ class AudioSystem:
         if position <= previous_position:
             return
 
-        # Locomotive: position is referenced to its right/front edge in the
-        # renderer; convert source-image x points into distances behind it.
+        camera_offset = getattr(camera, "consist_offset_m", 0.0)
+        loco_distance = abs(camera_offset)
         for pair_index, pair in enumerate(self.LOCO_PAIRS):
             offsets = tuple(
                 (self._loco_image_width - x) / self._loco_image_width * train.loco_length_m
                 for x in pair
             )
             self._process_pair(("loco", pair_index), offsets,
-                               previous_position, position, speed)
+                               previous_position, position, speed, loco_distance)
 
-        # Wagons are laid out to the right of the locomotive in the side view.
-        # Their world-position offsets therefore continue in the negative direction.
         for wagon in train.wagons:
             if wagon.is_loco:
                 continue
@@ -133,11 +138,11 @@ class AudioSystem:
                     - (x / self._car_image_width) * train.car_length_m
                     for x in pair
                 )
+                wagon_center = wagon.index * train.car_length_m
+                distance = abs(wagon_center - camera_offset)
                 self._process_pair((f"wagon_{wagon.index}", pair_index), offsets,
-                                   previous_position, position, speed)
+                                   previous_position, position, speed, distance)
 
-        # Avoid keeping stale pair IDs if an audio file is missing or the train
-        # has already passed a long section of track.
         if len(self._pair_sequences) > 512:
             cutoff = int((position - train.consist_length_m) // self.JOINT_SPACING_M) - 4
             self._pair_sequences = {

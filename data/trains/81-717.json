@@ -1,1 +1,24 @@
-{"name":"81-717","display_name":"Номерной","wagons":6,"max_speed_kmh":90,"acceleration_mps2":0.75,"brake_mps2":1.0,"length_m":115.2}
+{
+  "name": "81-717",
+  "display_name": "Номерной",
+  "wagons": 6,
+  "max_speed_kmh": 90,
+  "acceleration_mps2": 0.72,
+  "brake_mps2": 1,
+  "emergency_brake_mps2": 1.35,
+  "jerk_mps3": 0.38,
+  "traction_notches_mps2": [
+    0.2,
+    0.36,
+    0.54,
+    0.72
+  ],
+  "brake_notches_mps2": [
+    0.35,
+    0.65,
+    1.05
+  ],
+  "loco_length_m": 19.2,
+  "car_length_m": 19.2,
+  "length_m": 115.2
+}

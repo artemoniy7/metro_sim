@@ -3,7 +3,7 @@ import math
 
 
 class AlsArs:
-    def __init__(self, default_limit_kmh=60):
+    def __init__(self, default_limit_kmh=80):
         self.default_limit = default_limit_kmh / 3.6
         self.emergency_brake = False
         self.service_brake = 1.15

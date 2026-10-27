@@ -7,7 +7,7 @@
     155
   ],
   "total_length_m": 41470,
-  "station_length_m": 155,
+  "station_length_m": 162,
   "points": [
     [
       0,
@@ -116,7 +116,7 @@
       "name": "Алтуфьево",
       "position": 0,
       "depth_m": 9,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -124,7 +124,7 @@
       "name": "Бибирево",
       "position": 2089,
       "depth_m": 9.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -132,7 +132,7 @@
       "name": "Отрадное",
       "position": 4804,
       "depth_m": 9,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -140,7 +140,7 @@
       "name": "Владыкино",
       "position": 6266,
       "depth_m": 10.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -148,7 +148,7 @@
       "name": "Петровско-Разумовская",
       "position": 8146,
       "depth_m": 61,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -156,7 +156,7 @@
       "name": "Тимирязевская",
       "position": 10025,
       "depth_m": 63.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -164,7 +164,7 @@
       "name": "Дмитровская",
       "position": 11488,
       "depth_m": 59,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -172,7 +172,7 @@
       "name": "Савёловская",
       "position": 13472,
       "depth_m": 52,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -180,7 +180,7 @@
       "name": "Менделеевская",
       "position": 15143,
       "depth_m": 48.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -188,7 +188,7 @@
       "name": "Цветной бульвар",
       "position": 16396,
       "depth_m": 50,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -196,7 +196,7 @@
       "name": "Чеховская",
       "position": 17858,
       "depth_m": 62,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -204,7 +204,7 @@
       "name": "Боровицкая",
       "position": 19529,
       "depth_m": 46.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -212,7 +212,7 @@
       "name": "Полянка",
       "position": 20886,
       "depth_m": 36.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -220,7 +220,7 @@
       "name": "Серпуховская",
       "position": 22244,
       "depth_m": 43,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -228,7 +228,7 @@
       "name": "Тульская",
       "position": 24124,
       "depth_m": 9.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -236,7 +236,7 @@
       "name": "Нагатинская",
       "position": 26421,
       "depth_m": 13.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -244,7 +244,7 @@
       "name": "Нагорная",
       "position": 28197,
       "depth_m": 9,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -252,7 +252,7 @@
       "name": "Нахимовский проспект",
       "position": 29763,
       "depth_m": 9.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -260,7 +260,7 @@
       "name": "Севастопольская",
       "position": 31121,
       "depth_m": 13,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -268,7 +268,7 @@
       "name": "Чертановская",
       "position": 33001,
       "depth_m": 10.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -276,7 +276,7 @@
       "name": "Южная",
       "position": 34880,
       "depth_m": 10,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -284,7 +284,7 @@
       "name": "Пражская",
       "position": 36029,
       "depth_m": 9.5,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -292,7 +292,7 @@
       "name": "Улица Академика Янгеля",
       "position": 38327,
       "depth_m": 8,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -300,7 +300,7 @@
       "name": "Аннино",
       "position": 39590,
       "depth_m": 8,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     },
     {
@@ -308,7 +308,7 @@
       "name": "Бульвар Дмитрия Донского",
       "position": 41470,
       "depth_m": 10,
-      "length_m": 155,
+      "length_m": 162,
       "dwell_seconds": 20
     }
   ],

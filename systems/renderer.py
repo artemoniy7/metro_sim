@@ -12,7 +12,9 @@ class Renderer:
         self.loco_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png")
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
-        self.vehicle_angles = {}
+        self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
+        self.vehicle_angles = {};
+        self._station_tile_cache = {}
         self.last_render_time = None
         # Cache tunnel tiles so they are not rescaled on every frame.
         self._tunnel_tile_cache = {}
@@ -113,12 +115,37 @@ class Renderer:
                     for station in line.stations
                 )
                 if at_station:
-                    # Stations use the requested red wall/background instead of tunnel texture.
-                    pygame.draw.rect(surface, (142, 24, 34),
-                                     (sx, track_y - tunnel_height, strip_width, tunnel_height + 20))
-                    if int(route_position) % 24 < 4:
-                        pygame.draw.line(surface, (105, 20, 29),
-                                         (sx, track_y - tunnel_height), (sx, track_y + 12), 2)
+                    # Repeat the station photo along the platform, with a taller ceiling
+                    # than the regular tunnel so the station feels more spacious.
+                    station_height = max(tunnel_height + 1, round(8.5 * scale))
+                    station_bottom_extra = max(1, round(0.25 * scale))
+                    if self.station_image is not None:
+                        station_width = max(1, round(
+                            station_height * self.station_image.get_width()
+                            / self.station_image.get_height()))
+                        station_key = (id(self.station_image), station_width, station_height)
+                        if station_key not in self._station_tile_cache:
+                            self._station_tile_cache = {
+                                station_key: pygame.transform.smoothscale(
+                                    self.station_image, (station_width, station_height))
+                            }
+                        station_tile = self._station_tile_cache[station_key]
+                        tile_x = int((world_x * scale) % station_width)
+                        src_x = min(station_width - 1, max(0, tile_x))
+                        slice_width = min(strip_width, station_width - src_x)
+                        if slice_width > 0:
+                            surface.blit(
+                                station_tile.subsurface((src_x, 0, slice_width, station_height)),
+                                (sx, track_y - station_height + station_bottom_extra))
+                        if slice_width < strip_width:
+                            extra_width = min(strip_width - slice_width, station_width)
+                            surface.blit(
+                                station_tile.subsurface((0, 0, extra_width, station_height)),
+                                (sx + slice_width, track_y - station_height + station_bottom_extra))
+                    else:
+                        pygame.draw.rect(surface, (142, 24, 34),
+                                         (sx, track_y - station_height, strip_width,
+                                          station_height + 20))
                 else:
                     src_x = int((world_x * scale) % tunnel_width)
                     src_x = min(tunnel_width - 1, max(0, src_x))

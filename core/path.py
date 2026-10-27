@@ -23,6 +23,22 @@ class TrackPath:
             distance -= length
         return self.points[-1]
 
+    def grade_acceleration(self, distance, gravity=9.81, max_grade=0.06):
+        """Gravity acceleration along track; screen-down is downhill."""
+        if len(self.points) < 2:
+            return 0.0
+        remaining = max(0.0, min(float(distance), self.total_length))
+        for i, length in enumerate(self.lengths):
+            if remaining <= length:
+                if length <= 0:
+                    return 0.0
+                a, b = self.points[i], self.points[i + 1]
+                grade = (b[1] - a[1]) / length
+                grade = max(-max_grade, min(max_grade, grade))
+                return gravity * grade
+            remaining -= length
+        return 0.0
+
     def sample(self, step=32):
         if len(self.points) < 2:
             return self.points[:]

@@ -42,6 +42,7 @@ class AudioSystem:
         self.brake_channel_alt = None
         self._active_brake_channel = 0
         self._brake_target_volume = 0.0
+        self._brake_stop_fade_done = False
         self._was_braking = False
         self._played_near_stop = False
         self._last_brake_notch = 0
@@ -139,10 +140,12 @@ class AudioSystem:
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
 
         if not braking:
-            # Fade the last squeal out instead of letting it continue after braking.
-            for channel in (self.brake_channel, self.brake_channel_alt):
-                if channel is not None and channel.get_busy():
-                    channel.fadeout(250)
+            # Fade once when the brake command is released; don't restart fadeout every frame.
+            if self._was_braking:
+                for channel in (self.brake_channel, self.brake_channel_alt):
+                    if channel is not None and channel.get_busy():
+                        channel.fadeout(250)
+            self._brake_stop_fade_done = False
             self._was_braking = False
             self._played_near_stop = False
             self._last_brake_notch = 0
@@ -155,6 +158,7 @@ class AudioSystem:
         self._brake_target_volume = target_volume
 
         if not self._was_braking or brake_notch != self._last_brake_notch:
+            self._brake_stop_fade_done = False
             sound = self.brake_sounds.get(sound_key)
             if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
                 # Alternate channels so a new brake notch can blend in smoothly.
@@ -186,9 +190,11 @@ class AudioSystem:
 
         # Silence brake squeal once the train is effectively stopped.
         if speed_kmh <= self.BRAKE_SOUND_MIN_SPEED_KMH:
-            for channel in (self.brake_channel, self.brake_channel_alt):
-                if channel is not None and channel.get_busy():
-                    channel.fadeout(250)
+            if not self._brake_stop_fade_done:
+                for channel in (self.brake_channel, self.brake_channel_alt):
+                    if channel is not None and channel.get_busy():
+                        channel.fadeout(250)
+                self._brake_stop_fade_done = True
             self._played_near_stop = True
             return
 

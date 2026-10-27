@@ -76,7 +76,9 @@ class Renderer:
 
         def rail_y_at(screen_x):
             world_x = camera_x + screen_x / scale
-            return base_track_y - self._track_offset(world_x) * scale
+            route_position = max(0.0, min(line.path.total_length, line.path.total_length - world_x))
+            depth_m = line.path.point_at(route_position)[1]
+            return round(base_track_y + (depth_m - 10.0) * 1.35 - self._track_offset(world_x) * scale)
 
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
         tunnel_height = max(1, round(5.5 * scale))
@@ -87,7 +89,7 @@ class Renderer:
             for sx in range(0, width, strip_width):
                 world_x = camera_x + sx / scale
                 route_position = line.path.total_length - world_x
-                track_y = round(base_track_y - self._track_offset(world_x) * scale)
+                track_y = rail_y_at(sx)
                 at_station = any(
                     abs(route_position - float(station.get("position", 0)))
                     <= float(station.get("length_m", 155)) / 2
@@ -115,7 +117,7 @@ class Renderer:
                 route_position = line.path.total_length - (camera_x + sx / scale)
                 if any(abs(route_position - float(station.get("position", 0)))
                        <= float(station.get("length_m", 155)) / 2 for station in line.stations):
-                    track_y = round(base_track_y - self._track_offset(camera_x + sx / scale) * scale)
+                    track_y = rail_y_at(sx)
                     pygame.draw.rect(surface, (142, 24, 34),
                                      (sx, track_y - tunnel_height, 4, tunnel_height + 20))
 

@@ -21,11 +21,13 @@ class Train:
             "brake_notches_mps2", [0.45, 0.75, self.service_brake]
         )]
         self.controller_notch = 0  # -3..-1 = T3..T1, 0 = coast, 1..4 = G1..G4
-        car_count = max(1, int(data.get("wagons", 6)))
-        self.wagons = [Wagon(self.name, i, is_loco=(i == 0)) for i in range(car_count)]
+        car_count = max(2, int(data.get("wagons", 8)))
+        # Two cab cars at the ends, with six passenger cars between them.
+        self.wagons = [Wagon(self.name, i, is_loco=(i == 0 or i == car_count - 1))
+                       for i in range(car_count)]
         self.loco_length_m = float(data.get("loco_length_m", 20.0))
         self.car_length_m = float(data.get("car_length_m", 19.0))
-        self.position = 80.0
+        self.position = 0.0
         self.speed = 0.0
         self.emergency_brake_active = False
         self.acceleration_state = 0.0
@@ -41,7 +43,8 @@ class Train:
     def consist_length_m(self):
         if not self.wagons:
             return self.loco_length_m
-        return self.loco_length_m + (len(self.wagons) - 1) * self.car_length_m
+        return (self.loco_length_m * 2
+                + max(0, len(self.wagons) - 2) * self.car_length_m)
 
     @property
     def controller_label(self):

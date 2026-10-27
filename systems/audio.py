@@ -163,7 +163,7 @@ class AudioSystem:
                 current_channel = channels[self._active_brake_channel]
                 next_channel.stop()
                 next_channel.set_volume(0.0)
-                next_channel.play(sound)
+                next_channel.play(sound, fade_ms=350)
                 next_channel.set_volume(target_volume)
                 if current_channel.get_busy():
                     current_channel.fadeout(350)
@@ -183,6 +183,14 @@ class AudioSystem:
 
         self._was_braking = True
 
+        # Silence brake squeal once the train is effectively stopped.
+        if speed_kmh <= self.BRAKE_SOUND_MIN_SPEED_KMH:
+            for channel in (self.brake_channel, self.brake_channel_alt):
+                if channel is not None and channel.get_busy():
+                    channel.fadeout(250)
+            self._played_near_stop = True
+            return
+
         # Play the longer squeal near the stop, but only once per braking event.
         if (not self._played_near_stop
                 and self.BRAKE_SOUND_MIN_SPEED_KMH < speed_kmh <= self.BRAKE_NEAR_STOP_SPEED_KMH):
@@ -195,7 +203,7 @@ class AudioSystem:
                 current_channel = channels[self._active_brake_channel]
                 next_channel.stop()
                 next_channel.set_volume(0.0)
-                next_channel.play(sound)
+                next_channel.play(sound, fade_ms=350)
                 next_channel.set_volume(min(1.0, self.BRAKE_VOLUME * 1.45))
                 if current_channel.get_busy():
                     current_channel.fadeout(350)

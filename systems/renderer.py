@@ -59,7 +59,7 @@ class Renderer:
     def _draw_train_sprite(self, surface, image, scaled_width, scaled_height,
                            left_axle_ratio, right_axle_ratio, axle_y_ratio,
                            left_x, right_x, left_y, right_y, vehicle_key, frame_dt,
-                           doors_open=False, show_doors=False):
+                           doors_open=False, show_doors=False, angle_override=None):
         """Rotate a scaled train sprite and anchor its axle midpoint to the rails."""
         import math
         if image is None:
@@ -94,7 +94,8 @@ class Renderer:
                 sprite.blit(right_door, (right_x, door_y))
         dx = right_x - left_x
         dy = right_y - left_y
-        target_angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
+        target_angle = (angle_override if angle_override is not None else
+                        -math.degrees(math.atan2(dy, max(1e-6, dx))))
         previous_angle = self.vehicle_angles.get(vehicle_key, target_angle)
         angle_delta = (target_angle - previous_angle + 180.0) % 360.0 - 180.0
         smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
@@ -260,6 +261,19 @@ class Renderer:
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
+
+        # Treat the whole consist as one connected train: calculate a single
+        # orientation from the rails across the full train, not one per car.
+        consist_left_x = loco_x
+        consist_right_x = loco_x + train.consist_length_m * scale
+        consist_dx = max(1.0, consist_right_x - consist_left_x)
+        consist_dy = rail_y_at(consist_right_x) - rail_y_at(consist_left_x)
+        target_consist_angle = -math.degrees(math.atan2(consist_dy, consist_dx))
+        previous_consist_angle = self.vehicle_angles.get("consist", target_consist_angle)
+        angle_delta = (target_consist_angle - previous_consist_angle + 180.0) % 360.0 - 180.0
+        angle_smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
+        consist_angle = previous_consist_angle + angle_delta * angle_smoothing
+        self.vehicle_angles["consist"] = consist_angle
         loco_height = (self._scaled_sprite(self.loco_image, loco_width).get_height()
                        if self._scaled_sprite(self.loco_image, loco_width) is not None else 48)
         car = self._scaled_sprite(self.car_image, car_width, loco_height)
@@ -293,7 +307,8 @@ class Renderer:
                                             axle_y_ratio, left_x, right_x, left_y, right_y,
                                             f"loco_{wagon.index}", frame_dt,
                                             doors_open=doors_open,
-                                            show_doors=(wagon.index == 0))
+                                            show_doors=(wagon.index == 0),
+                                            angle_override=consist_angle)
                 else:
                     car_sprite = self._scaled_sprite(vehicle_image, vehicle_width, loco_height)
                     if car_sprite is not None:
@@ -305,7 +320,8 @@ class Renderer:
                         self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
                                                 left_ratio_car, right_ratio_car, 435 / src_h,
                                                 left_x, right_x, left_y, right_y,
-                                                f"wagon_{wagon.index}", frame_dt)
+                                                f"wagon_{wagon.index}", frame_dt,
+                                                angle_override=consist_angle)
             else:
                 left_y, right_y = rail_y_at(vehicle_x), rail_y_at(vehicle_x + vehicle_width)
                 pygame.draw.polygon(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196),

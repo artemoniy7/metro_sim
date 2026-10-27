@@ -11,6 +11,9 @@ class Renderer:
         self.small_font = pygame.font.Font(None, 21)
         self.loco_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png")
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
+        self.door_left_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-door-left.png")
+        self.door_right_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-door-right.png")
+        self.door_open_amount = 0.0
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
@@ -55,12 +58,40 @@ class Renderer:
 
     def _draw_train_sprite(self, surface, image, scaled_width, scaled_height,
                            left_axle_ratio, right_axle_ratio, axle_y_ratio,
-                           left_x, right_x, left_y, right_y, vehicle_key, frame_dt):
+                           left_x, right_x, left_y, right_y, vehicle_key, frame_dt,
+                           doors_open=False, show_doors=False):
         """Rotate a scaled train sprite and anchor its axle midpoint to the rails."""
         import math
         if image is None:
             return
         sprite = pygame.transform.smoothscale(image, (max(1, scaled_width), max(1, scaled_height)))
+        if show_doors and self.door_left_image is not None and self.door_right_image is not None:
+            source_width, source_height = image.get_size()
+            sx = scaled_width / source_width
+            sy = scaled_height / source_height
+            # Door coordinates are measured on the original 81-760 locomotive texture.
+            openings = ((373, 81, 553, 322), (939, 81, 1119, 322),
+                        (1433, 81, 1613, 322), (1897, 81, 2077, 322))
+            for x1, y1, x2, y2 in openings:
+                opening_width = x2 - x1
+                opening_height = y2 - y1
+                left_width = 91
+                right_width = 90
+                left_height = 243
+                right_height = 243
+                left_door = pygame.transform.smoothscale(
+                    self.door_left_image, (max(1, round(left_width * sx)),
+                                           max(1, round(left_height * sy))))
+                right_door = pygame.transform.smoothscale(
+                    self.door_right_image, (max(1, round(right_width * sx)),
+                                            max(1, round(right_height * sy))))
+                # The leaves slide away from the centre of the doorway.
+                amount = self.door_open_amount if doors_open else 0.0
+                left_x = round(x1 * sx - left_door.get_width() * amount)
+                right_x = round((x2 - right_width) * sx + right_door.get_width() * amount)
+                door_y = round(y1 * sy)
+                sprite.blit(left_door, (left_x, door_y))
+                sprite.blit(right_door, (right_x, door_y))
         dx = right_x - left_x
         dy = right_y - left_y
         target_angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
@@ -79,13 +110,19 @@ class Renderer:
         draw_y = round(target_mid_y - rotated_offset.y - rotated.get_height() / 2.0)
         surface.blit(rotated, (draw_x, draw_y))
 
-    def draw_scene(self, surface, line, train, camera, elapsed):
+    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False):
         width, height = surface.get_size()
         if self.last_render_time is None:
             frame_dt = 1.0 / 60.0
         else:
             frame_dt = max(0.0, min(0.1, elapsed - self.last_render_time))
         self.last_render_time = elapsed
+        target_door_amount = 1.0 if doors_open else 0.0
+        door_step = frame_dt / 0.45
+        if self.door_open_amount < target_door_amount:
+            self.door_open_amount = min(target_door_amount, self.door_open_amount + door_step)
+        else:
+            self.door_open_amount = max(target_door_amount, self.door_open_amount - door_step)
         scale = camera.pixels_per_metre
         base_track_y = int(height * 0.79)
         camera_x = camera.x
@@ -254,7 +291,9 @@ class Renderer:
                     self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
                                             vehicle_left_ratio, vehicle_right_ratio,
                                             axle_y_ratio, left_x, right_x, left_y, right_y,
-                                            f"loco_{wagon.index}", frame_dt)
+                                            f"loco_{wagon.index}", frame_dt,
+                                            doors_open=doors_open,
+                                            show_doors=(wagon.index == 0))
                 else:
                     car_sprite = self._scaled_sprite(vehicle_image, vehicle_width, loco_height)
                     if car_sprite is not None:

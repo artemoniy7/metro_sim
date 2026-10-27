@@ -5,6 +5,19 @@
   "max_speed_kmh": 90,
   "acceleration_mps2": 0.9,
   "brake_mps2": 1.15,
+  "emergency_brake_mps2": 1.5,
+  "jerk_mps3": 0.45,
+  "traction_notches_mps2": [
+    0.25,
+    0.45,
+    0.68,
+    0.9
+  ],
+  "brake_notches_mps2": [
+    0.45,
+    0.8,
+    1.25
+  ],
   "loco_length_m": 20,
   "car_length_m": 19,
   "length_m": 115

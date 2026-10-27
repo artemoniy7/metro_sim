@@ -32,6 +32,9 @@ class Train:
         self.brake_applied = False
         self._brake_command_timer = 0.0
         self.BRAKE_RESPONSE_DELAY_S = 1.0
+        # Small rolling/air resistance: noticeable over time, but not a hard brake.
+        self.rolling_resistance = 0.012  # m/s² at low speed
+        self.speed_resistance = 0.00025  # additional m/s² per m/s
         self.als = AlsArs()
 
     @property
@@ -53,6 +56,10 @@ class Train:
             return
         dt = min(dt, 0.1)
         limit = self.als.speed_limit(line, self.position, self.max_speed)
+        grade_acceleration = line.path.grade_acceleration(self.position)
+        resistance = self.rolling_resistance + self.speed_resistance * self.speed
+        # Positive grade acceleration means gravity helps the train move forward.
+        natural_acceleration = grade_acceleration - resistance if self.speed > 0 else grade_acceleration
 
         # The train takes one second to react to a brake command.
         brake_commanded = self.emergency_brake_active or self.controller_notch < 0
@@ -71,7 +78,8 @@ class Train:
                 deceleration = self.brake_notches[index]
 
             # Ramp braking force in gradually instead of changing speed abruptly.
-            target_acceleration = -deceleration
+            # Gravity can help or oppose braking; rolling resistance always slows the train.
+            target_acceleration = -deceleration + grade_acceleration - resistance
             change = self.jerk_limit * dt
             self.acceleration_state += max(
                 -change, min(change, target_acceleration - self.acceleration_state)
@@ -85,10 +93,10 @@ class Train:
                 self.speed = max(limit, self.speed - self.service_brake * dt)
                 self.acceleration_state = min(0.0, self.acceleration_state)
             else:
-                target_acceleration = 0.0
+                target_acceleration = natural_acceleration
                 if self.controller_notch > 0:
                     index = min(len(self.traction_notches) - 1, self.controller_notch - 1)
-                    target_acceleration = self.traction_notches[index]
+                    target_acceleration += self.traction_notches[index]
                     # Traction weakens as speed rises, so the train accelerates
                     # more strongly at low speed and more gently near 80 km/h.
                     speed_kmh = self.speed * 3.6
@@ -101,8 +109,6 @@ class Train:
                     -change, min(change, target_acceleration - self.acceleration_state)
                 )
                 self.speed = max(0.0, min(limit, self.speed + self.acceleration_state * dt))
-                if self.controller_notch == 0 and self.speed > 0:
-                    self.speed = max(0.0, self.speed - 0.025 * dt)
 
         self.position = min(max(0.0, line.path.total_length), self.position + self.speed * dt)
         if self.position >= line.path.total_length:

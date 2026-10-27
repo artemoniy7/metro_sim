@@ -12,6 +12,8 @@ class Renderer:
         self.loco_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png")
         self.car_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-car.png")
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
+        # Keep a separate, smoothed pitch angle for each car to avoid visual jolts.
+        self.vehicle_angles = {}
 
     @staticmethod
     def _load_sprite(path):
@@ -50,7 +52,10 @@ class Renderer:
         )
         dx = right_x - left_x
         dy = right_y - left_y
-        angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
+        target_angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
+        vehicle_key = getattr(image, "_vehicle_key", None)
+        # The caller supplies per-vehicle identity via an optional temporary attribute below.
+        angle = target_angle
         rotated = pygame.transform.rotozoom(sprite, angle, 1.0)
 
         # Axle midpoint in source-sprite coordinates, relative to its centre.

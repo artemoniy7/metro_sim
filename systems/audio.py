@@ -175,11 +175,11 @@ class AudioSystem:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
 
         # Both launch sounds begin immediately. Rusich gives the initial
-        # low-speed motor character; async fades out by 40 km/h.
+        # low-speed motor character; async starts fading out at about 25 km/h and fades away gradually by 45 km/h.
         # The louder 81-760 layers then crossfade in as speed rises.
         speed_weights = (
             max(0.0, 1.0 - speed_kmh / 22.0),
-            max(0.0, 1.0 - speed_kmh / 40.0),
+            max(0.0, min(1.0, (45.0 - speed_kmh) / (45.0 - 25.0))),
             self._fade_in(speed_kmh, 10.0, 25.0)
             * (1.0 - self._fade_in(speed_kmh, 45.0, 58.0)),
             self._fade_in(speed_kmh, 35.0, 55.0),

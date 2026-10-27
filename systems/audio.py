@@ -13,7 +13,7 @@ class AudioSystem:
     SOUND_FULL_VOLUME_DISTANCE_M = 12.0
     SOUND_CUTOFF_DISTANCE_M = 85.0
     ROLLING_MAX_VOLUME = 0.38
-    ENGINE_MAX_VOLUME = 0.32
+    ENGINE_MAX_VOLUME = 0.48
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -170,8 +170,10 @@ class AudioSystem:
         # avoids an abrupt cut when the controller returns to zero.
         traction = 0.0
         if train.controller_notch > 0 and not train.emergency_brake_active:
-            traction = min(1.0, 0.35 + train.controller_notch * 0.16)
+            traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
 
+        # Keep the launch layer fully available from 0 km/h: the motor should
+        # be audible as soon as the driver applies traction, not only after rolling.
         speed_weights = (
             max(0.0, 1.0 - self._fade_in(speed_kmh, 22.0, 36.0)),
             self._fade_in(speed_kmh, 10.0, 25.0)

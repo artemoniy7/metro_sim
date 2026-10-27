@@ -1,5 +1,4 @@
 """Randomized 81-760 rail-joint sounds triggered by individual wheel points."""
-from pathlib import Path
 import random
 import re
 
@@ -20,6 +19,7 @@ class AudioSystem:
         self.sounds = {}
         self._last_position = None
         self._pair_sequences = {}
+        self._groups = []
         self._loco_image_width = 2048
         self._car_image_width = 2048
 
@@ -40,6 +40,8 @@ class AudioSystem:
                     self.sounds[(group, hit)] = sound
                 except (pygame.error, OSError):
                     continue
+
+            self._groups = sorted({group for group, hit in self.sounds if hit == 1 and (group, 2) in self.sounds})
 
             # Use the actual sprite dimensions so the wheel coordinates match
             # the points drawn by Renderer, even if the source image changes.
@@ -84,7 +86,9 @@ class AudioSystem:
         current_second = position + second_offset
 
         for joint_index in self._crossed_joints(previous_first, current_first):
-            group = random.choice(sorted({g for g, h in self.sounds if h == 1}))
+            if not self._groups:
+                return
+            group = random.choice(self._groups)
             self._pair_sequences[(pair_key, joint_index)] = group
             self._play(group, 1, speed)
 
@@ -110,10 +114,6 @@ class AudioSystem:
 
         # Locomotive: position is referenced to its right/front edge in the
         # renderer; convert source-image x points into distances behind it.
-        loco_offsets = [
-            (self._loco_image_width - x) / self._loco_image_width * train.loco_length_m
-            for pair in self.LOCO_PAIRS for x in pair
-        ]
         for pair_index, pair in enumerate(self.LOCO_PAIRS):
             offsets = tuple(
                 (self._loco_image_width - x) / self._loco_image_width * train.loco_length_m
@@ -139,7 +139,7 @@ class AudioSystem:
         # Avoid keeping stale pair IDs if an audio file is missing or the train
         # has already passed a long section of track.
         if len(self._pair_sequences) > 512:
-            cutoff = int((position + train.consist_length_m) // self.JOINT_SPACING_M) - 4
+            cutoff = int((position - train.consist_length_m) // self.JOINT_SPACING_M) - 4
             self._pair_sequences = {
                 key: group for key, group in self._pair_sequences.items()
                 if key[1] >= cutoff

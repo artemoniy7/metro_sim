@@ -74,6 +74,7 @@ class AudioSystem:
             pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
             pygame.mixer.set_reserved(8)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
+            self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
             self.brake_channel = pygame.mixer.Channel(7)
             self.brake_channel_alt = pygame.mixer.Channel(8)
 

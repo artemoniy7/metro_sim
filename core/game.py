@@ -29,6 +29,7 @@ class Game:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_v:
             self.doors_open = not self.doors_open
+            self.audio.play_door_sound()
         elif event.type == pygame.MOUSEWHEEL:
             self.camera.zoom_by(event.y * 0.15)
         elif event.type == pygame.MOUSEBUTTONDOWN:

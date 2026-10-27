@@ -20,6 +20,7 @@ class Train:
         self.speed = 0.0
         self.throttle = 0.0
         self.brake = 0.0
+        self.emergency_brake_active = False
         self.acceleration_state = 0.0
         self.als = AlsArs()
 
@@ -37,7 +38,7 @@ class Train:
         limit = self.als.speed_limit(line, self.position, self.max_speed)
         # Smoothly start and release traction; no instant speed changes.
         if self.brake > 0:
-            deceleration = self.emergency_brake if self.als.emergency_brake else self.service_brake
+            deceleration = self.emergency_brake if self.emergency_brake_active else self.service_brake
             self.speed = max(0.0, self.speed - deceleration * min(1.0, self.brake) * dt)
             self.acceleration_state = 0.0
         else:

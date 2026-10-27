@@ -7,12 +7,14 @@ from core.line import Line
 from systems.loader import load_json
 from systems.renderer import Renderer
 from systems.input import InputController
+from systems.audio import AudioSystem
 
 
 class Game:
     def __init__(self):
         self.renderer = Renderer()
         self.controls = InputController()
+        self.audio = AudioSystem()
         self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
         self.line = Line(self.line_data)
         # 81-760 is the playable train; its sprites live in assets/trains/81-760/.
@@ -31,6 +33,7 @@ class Game:
         self.elapsed += dt
         self.controls.update(self.train, dt)
         self.train.update(dt, self.line)
+        self.audio.update(self.train, dt)
         self.camera.follow(self.train, self.line.path.total_length)
 
     def render(self, surface):

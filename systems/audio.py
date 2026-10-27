@@ -1,4 +1,4 @@
-"""Randomized 81-760 rail-joint sounds triggered by individual wheel points."""
+"""Randomized 81-760 rail-joint sounds and train audio."""
 import random
 import re
 
@@ -14,6 +14,9 @@ class AudioSystem:
     SOUND_CUTOFF_DISTANCE_M = 85.0
     ROLLING_MAX_VOLUME = 0.38
     ENGINE_MAX_VOLUME = 0.48
+    BRAKE_VOLUME = 0.62
+    BRAKE_NEAR_STOP_SPEED_KMH = 4.0
+    BRAKE_SOUND_MIN_SPEED_KMH = 2.0
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -32,6 +35,11 @@ class AudioSystem:
         self.engine_sounds = []
         self.engine_channels = []
         self._engine_volumes = [0.0, 0.0, 0.0, 0.0]
+        self.brake_sounds = {}
+        self.brake_channel = None
+        self._was_braking = False
+        self._played_near_stop = False
+        self._last_brake_notch = 0
 
         try:
             if pygame.mixer.get_init() is None:
@@ -58,11 +66,26 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     self.engine_sounds.append(None)
 
-            # Dedicated channels keep rolling and engine loops separate from joint effects.
             pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
-            pygame.mixer.set_reserved(6)
+            pygame.mixer.set_reserved(7)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
+            self.brake_channel = pygame.mixer.Channel(6)
+
+            # Short squeals are used when braking starts; the longer recordings
+            # are reserved for the final few km/h before the train stops.
+            brake_dir = rolling_dir / "brake"
+            for key, filename in (
+                ("gentle", "brake_squeal1.wav"),
+                ("medium", "brake_squeal3.wav"),
+                ("strong", "brake_squeal1_03.wav"),
+                ("near_stop_a", "brake_squeal1_02v2.wav"),
+                ("near_stop_b", "brake_squeal1_03.wav"),
+            ):
+                try:
+                    self.brake_sounds[key] = pygame.mixer.Sound(str(brake_dir / filename))
+                except (pygame.error, OSError):
+                    self.brake_sounds[key] = None
 
             sound_dir = rolling_dir / "joint"
             # New exterior recordings encode the recording speed in the filename:
@@ -103,6 +126,47 @@ class AudioSystem:
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
 
+    def _update_brakes(self, train):
+        """Play a brake squeal on brake application and a longer squeal near a stop."""
+        speed_kmh = abs(train.speed) * 3.6
+        braking = train.emergency_brake_active or train.controller_notch < 0
+        brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
+
+        if not braking:
+            self._was_braking = False
+            self._played_near_stop = False
+            self._last_brake_notch = 0
+            return
+
+        if not self._was_braking:
+            # T1, T2 and T3 have progressively stronger and louder brake sounds.
+            sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
+            sound = self.brake_sounds.get(sound_key)
+            if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
+                sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
+                self.brake_channel.play(sound)
+            self._was_braking = True
+            self._last_brake_notch = brake_notch
+
+        # If the driver increases braking while already braking, reflect the new notch
+        # with a short squeal, but avoid replaying it every frame.
+        elif brake_notch != self._last_brake_notch:
+            sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
+            sound = self.brake_sounds.get(sound_key)
+            if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
+                sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
+                self.brake_channel.play(sound)
+            self._last_brake_notch = brake_notch
+
+        # The longer, louder squeal is only triggered once, close to standstill.
+        if (not self._played_near_stop and self.BRAKE_SOUND_MIN_SPEED_KMH < speed_kmh <= self.BRAKE_NEAR_STOP_SPEED_KMH):
+            key = random.choice(("near_stop_a", "near_stop_b"))
+            sound = self.brake_sounds.get(key)
+            if sound is not None:
+                sound.set_volume(min(1.0, self.BRAKE_VOLUME * 1.45))
+                self.brake_channel.play(sound)
+            self._played_near_stop = True
+
     def _play(self, group, hit, speed, distance_m):
         sound = self.sounds.get((group, hit))
         if sound is None or speed < 0.5 or distance_m >= self.SOUND_CUTOFF_DISTANCE_M:
@@ -136,8 +200,6 @@ class AudioSystem:
         for joint_index in self._crossed_joints(previous_first, current_first):
             if not self._groups:
                 return
-            # Prefer samples recorded near the train's current speed, while
-            # retaining variation between recordings at that speed.
             speed_kmh = speed * 3.6
             closest_difference = min(
                 abs(self._group_speeds[group] - speed_kmh)
@@ -162,8 +224,6 @@ class AudioSystem:
 
     def _update_rolling(self, speed_mps):
         speed_kmh = speed_mps * 3.6
-        # Start each layer 10 km/h before its nominal range, then crossfade
-        # gradually so the next sound is already present before the threshold.
         volumes = (
             self._fade_in(speed_kmh, 20.0, 30.0)
             * (1.0 - self._fade_in(speed_kmh, 40.0, 50.0)),
@@ -186,15 +246,9 @@ class AudioSystem:
 
     def _update_engine(self, train, dt):
         speed_kmh = abs(train.speed) * 3.6
-        # The motor is audible under traction; easing the volume down on coast/braking
-        # avoids an abrupt cut when the controller returns to zero.
         traction = 0.0
         if train.controller_notch > 0 and not train.emergency_brake_active:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
-
-        # Both launch sounds begin immediately. Rusich gives the initial
-        # low-speed motor character; async starts fading out at about 25 km/h and fades away gradually by 45 km/h.
-        # The louder 81-760 layers then crossfade in as speed rises.
         speed_weights = (
             max(0.0, 1.0 - speed_kmh / 22.0),
             max(0.0, min(1.0, (45.0 - speed_kmh) / (45.0 - 25.0))),
@@ -203,7 +257,6 @@ class AudioSystem:
             self._fade_in(speed_kmh, 35.0, 55.0),
         )
         smoothing = min(1.0, max(0.0, dt) * 3.5)
-
         for index, (sound, channel, weight) in enumerate(zip(
             self.engine_sounds, self.engine_channels, speed_weights
         )):
@@ -211,8 +264,7 @@ class AudioSystem:
                 continue
             target = weight * traction
             self._engine_volumes[index] += (target - self._engine_volumes[index]) * smoothing
-            volume = self.ENGINE_MAX_VOLUME * self._engine_volumes[index]
-            channel.set_volume(volume)
+            channel.set_volume(self.ENGINE_MAX_VOLUME * self._engine_volumes[index])
             if target > 0.01 and not channel.get_busy():
                 channel.play(sound, loops=-1)
             elif target <= 0.01 and self._engine_volumes[index] < 0.015:
@@ -224,6 +276,7 @@ class AudioSystem:
         speed = abs(train.speed)
         self._update_rolling(speed)
         self._update_engine(train, dt)
+        self._update_brakes(train)
         if not self.sounds:
             return
 

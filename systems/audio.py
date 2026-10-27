@@ -173,41 +173,27 @@ class AudioSystem:
                     continue
         self.station_announcement_index = 0
 
-    def toggle_station_announcer(self, train):
-        """Toggle the station announcer; at the first station, wait for departure."""
-        self.station_announcer_enabled = not self.station_announcer_enabled
-        if not self.station_announcer_enabled:
-            self.station_announcer_pending_start = False
-            if self.station_announcement_channel is not None:
-                self.station_announcement_channel.stop()
+    def toggle_station_announcer(self, train=None):
+        """Play exactly one next announcement each time I is pressed."""
+        channel = self.station_announcement_channel
+        if channel is None or not self.station_announcements:
             return
 
-        self.station_announcement_index = 0
-        if self.station_announcement_channel is None:
-            self.station_announcer_enabled = False
-            return
-        self.station_announcement_channel.stop()
-        self.station_announcer_pending_start = float(getattr(train, "position", 0.0)) <= 1.0
+        # If a clip is already playing, I stops it and advances to the next one.
+        if channel.get_busy():
+            channel.stop()
+
+        if self.station_announcement_index >= len(self.station_announcements):
+            self.station_announcement_index = 0
+
+        sound = self.station_announcements[self.station_announcement_index]
+        self.station_announcement_index += 1
+        channel.set_volume(1.0)
+        channel.play(sound)
 
     def update_station_announcer(self, train):
-        """Play each available announcement in sequence without overlapping clips."""
-        channel = self.station_announcement_channel
-        if not self.station_announcer_enabled or channel is None:
-            return
-        if self.station_announcer_pending_start:
-            if float(getattr(train, "position", 0.0)) <= 1.0:
-                return
-            self.station_announcer_pending_start = False
-        if channel.get_busy():
-            return
-
-        while self.station_announcement_index < len(self.station_announcements):
-            sound = self.station_announcements[self.station_announcement_index]
-            self.station_announcement_index += 1
-            channel.set_volume(1.0)
-            channel.play(sound)
-            return
-        # Keep the announcer enabled at the end; pressing I again restarts it.
+        """Announcements are triggered manually with I; never autoplay."""
+        return
 
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""

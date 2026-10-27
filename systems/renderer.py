@@ -30,28 +30,39 @@ class Renderer:
 
     @staticmethod
     def _track_offset(world_x):
-        """Gentle test-track rises and dips, measured in world metres."""
+        """Smooth, shallow test-track rises and dips, measured in world metres."""
         import math
-        return (0.62 * math.sin(world_x / 34.0)
-                + 0.28 * math.sin(world_x / 13.5 + 0.8))
+        # Long wavelengths and modest amplitudes avoid abrupt-looking changes.
+        return (0.45 * math.sin(world_x / 85.0)
+                + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
     @staticmethod
-    def _rotate_around_axles(image, width, height, left_axle, right_axle, left_y, right_y):
-        """Scale a sprite, then rotate it so its axle points sit on the rail profile."""
+    def _draw_train_sprite(surface, image, scaled_width, scaled_height,
+                           left_axle_ratio, right_axle_ratio, axle_y_ratio,
+                           left_x, right_x, left_y, right_y):
+        """Rotate a scaled train sprite and anchor its axle midpoint to the rails."""
+        import math
         if image is None:
-            return None
-        sprite = pygame.transform.smoothscale(image, (max(1, width), max(1, height)))
-        dx = right_axle - left_axle
+            return
+
+        sprite = pygame.transform.smoothscale(
+            image, (max(1, scaled_width), max(1, scaled_height))
+        )
+        dx = right_x - left_x
         dy = right_y - left_y
-        angle = -__import__("math").degrees(__import__("math").atan2(dy, dx))
+        angle = -math.degrees(math.atan2(dy, max(1e-6, dx)))
         rotated = pygame.transform.rotozoom(sprite, angle, 1.0)
-        # Work out the original axle midpoint, rotate that point, and align it to
-        # the target axle midpoint. This keeps the wheels on the rails after rotation.
-        source_mid = ((left_axle + right_axle) / 2, (left_y + right_y) / 2)
-        rotated_mid = pygame.math.Vector2(source_mid[0] - width / 2, source_mid[1] - height / 2).rotate(angle)
-        rotated_mid.x += rotated.get_width() / 2
-        rotated_mid.y += rotated.get_height() / 2
-        return rotated, rotated_mid
+
+        # Axle midpoint in source-sprite coordinates, relative to its centre.
+        source_mid_x = ((left_axle_ratio + right_axle_ratio) / 2.0 - 0.5) * scaled_width
+        source_mid_y = (axle_y_ratio - 0.5) * scaled_height
+        rotated_offset = pygame.math.Vector2(source_mid_x, source_mid_y).rotate(angle)
+
+        target_mid_x = (left_x + right_x) / 2.0
+        target_mid_y = (left_y + right_y) / 2.0
+        draw_x = round(target_mid_x - rotated_offset.x - rotated.get_width() / 2.0)
+        draw_y = round(target_mid_y - rotated_offset.y - rotated.get_height() / 2.0)
+        surface.blit(rotated, (draw_x, draw_y))
 
     def draw_scene(self, surface, line, train, camera, elapsed):
         width, height = surface.get_size()
@@ -60,8 +71,9 @@ class Renderer:
         camera_x = camera.x
 
         def rail_y_at(screen_x):
+            # Keep sub-pixel precision for rotation angles; round only when drawing.
             world_x = camera_x + screen_x / scale
-            return int(base_track_y - self._track_offset(world_x) * scale)
+            return base_track_y - self._track_offset(world_x) * scale
 
         # Tunnel image follows the changing track height, while preserving its texture.
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
@@ -72,7 +84,7 @@ class Renderer:
             strip_width = 4
             for sx in range(0, width, strip_width):
                 world_x = camera_x + sx / scale
-                track_y = int(base_track_y - self._track_offset(world_x) * scale)
+                track_y = round(base_track_y - self._track_offset(world_x) * scale)
                 src_x = int((world_x * scale) % tunnel_width)
                 src_x = min(tunnel_width - 1, max(0, src_x))
                 slice_width = min(strip_width, tunnel_width - src_x)
@@ -124,38 +136,33 @@ class Renderer:
                 pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, sy - 56), 8)
                 surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 10, sy - 66))
 
-        # Axle positions are measured on the original source images. Use them to
-        # calculate the rotation of each car body, without warping its proportions.
-        loco_x = int((line.path.total_length - train.position - train.loco_length_m - camera_x) * scale)
+        # Place each vehicle by its real axle points. The axle midpoint is anchored
+        # directly to the smooth rail profile, so the train cannot sink below the track.
+        loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
         loco = self._scaled_sprite(self.loco_image, loco_width)
         loco_height = loco.get_height() if loco is not None else 48
         car = self._scaled_sprite(self.car_image, car_width, loco_height)
-        car_count = sum(1 for wagon in train.wagons if not wagon.is_loco)
-        total_train_width = loco_width + car_count * car_width
 
         if loco is not None:
-            # Source locomotive axles: (499,464) left and (1902,464) right.
             src_w, src_h = self.loco_image.get_size()
             left_ratio, right_ratio = 499 / src_w, 1902 / src_w
-            axle_left_x = loco_x + left_ratio * loco_width
-            axle_right_x = loco_x + right_ratio * loco_width
-            left_y = rail_y_at(max(0, min(width - 1, round(axle_left_x))))
-            right_y = rail_y_at(max(0, min(width - 1, round(axle_right_x))))
-            angle = -__import__("math").degrees(__import__("math").atan2(right_y - left_y, axle_right_x - axle_left_x))
-            rotated = pygame.transform.rotozoom(loco, angle, 1.0)
-            source_mid = pygame.math.Vector2((left_ratio - 0.5) * loco_width, 0).rotate(angle)
-            target_mid_x = (axle_left_x + axle_right_x) / 2
-            target_mid_y = (left_y + right_y) / 2
-            draw_x = round(target_mid_x - source_mid.x - rotated.get_width() / 2)
-            draw_y = round(target_mid_y - source_mid.y - rotated.get_height() / 2)
-            surface.blit(rotated, (draw_x, draw_y))
+            axle_y_ratio = 464 / src_h
+            left_x = loco_x + left_ratio * loco_width
+            right_x = loco_x + right_ratio * loco_width
+            left_y = rail_y_at(left_x)
+            right_y = rail_y_at(right_x)
+            self._draw_train_sprite(
+                surface, self.loco_image, loco_width, loco_height,
+                left_ratio, right_ratio, axle_y_ratio,
+                left_x, right_x, left_y, right_y
+            )
         else:
             left_x = loco_x + loco_width * (499 / 1902)
-            left_y = rail_y_at(max(0, min(width - 1, round(left_x))))
+            left_y = rail_y_at(left_x)
             right_x = loco_x + loco_width
-            right_y = rail_y_at(max(0, min(width - 1, round(right_x))))
+            right_y = rail_y_at(right_x)
             pygame.draw.polygon(surface, (205, 210, 215),
                                 [(loco_x, left_y - 48), (loco_x + loco_width, right_y - 48),
                                  (loco_x + loco_width, right_y), (loco_x, left_y)])
@@ -165,24 +172,21 @@ class Renderer:
                 continue
             car_x = loco_x + loco_width + (wagon.index - 1) * car_width
             if car is not None:
-                # Source carriage axles: (334,435) left and (1898,435) right.
                 src_w, src_h = self.car_image.get_size()
                 left_ratio, right_ratio = 334 / src_w, 1898 / src_w
-                axle_left_x = car_x + left_ratio * car_width
-                axle_right_x = car_x + right_ratio * car_width
-                left_y = rail_y_at(max(0, min(width - 1, round(axle_left_x))))
-                right_y = rail_y_at(max(0, min(width - 1, round(axle_right_x))))
-                angle = -__import__("math").degrees(__import__("math").atan2(right_y - left_y, axle_right_x - axle_left_x))
-                rotated = pygame.transform.rotozoom(car, angle, 1.0)
-                source_mid = pygame.math.Vector2((left_ratio - 0.5) * car_width, 0).rotate(angle)
-                target_mid_x = (axle_left_x + axle_right_x) / 2
-                target_mid_y = (left_y + right_y) / 2
-                draw_x = round(target_mid_x - source_mid.x - rotated.get_width() / 2)
-                draw_y = round(target_mid_y - source_mid.y - rotated.get_height() / 2)
-                surface.blit(rotated, (draw_x, draw_y))
+                axle_y_ratio = 435 / src_h
+                left_x = car_x + left_ratio * car_width
+                right_x = car_x + right_ratio * car_width
+                left_y = rail_y_at(left_x)
+                right_y = rail_y_at(right_x)
+                self._draw_train_sprite(
+                    surface, self.car_image, car_width, loco_height,
+                    left_ratio, right_ratio, axle_y_ratio,
+                    left_x, right_x, left_y, right_y
+                )
             else:
-                left_y = rail_y_at(max(0, min(width - 1, car_x)))
-                right_y = rail_y_at(max(0, min(width - 1, car_x + car_width)))
+                left_y = rail_y_at(car_x)
+                right_y = rail_y_at(car_x + car_width)
                 pygame.draw.polygon(surface, (185, 190, 196),
                                     [(car_x, left_y - 48), (car_x + car_width, right_y - 48),
                                      (car_x + car_width, right_y), (car_x, left_y)])

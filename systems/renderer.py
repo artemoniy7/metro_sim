@@ -30,7 +30,19 @@ class Renderer:
             return None
         height = (max(1, round(width * image.get_height() / image.get_width()))
                   if target_height is None else max(1, int(target_height)))
-        return pygame.transform.smoothscale(image, (max(1, width), height))
+        size = (max(1, width), height)
+        # Reuse scaled sprites while zoom and target dimensions stay unchanged.
+        cache = Renderer.__dict__.get("_sprite_scale_cache")
+        if cache is None:
+            cache = {}
+            Renderer._sprite_scale_cache = cache
+        key = (id(image), size)
+        if key not in cache:
+            cache[key] = pygame.transform.smoothscale(image, size)
+            if len(cache) > 256:
+                cache.clear()
+                cache[key] = pygame.transform.smoothscale(image, size)
+        return cache[key]
 
     @staticmethod
     def _track_offset(world_x):

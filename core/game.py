@@ -22,10 +22,13 @@ class Game:
         # Close view of the locomotive, with mouse-wheel zoom and consist panning.
         self.camera = Camera(WINDOW_SIZE, zoom=2.8)
         self.elapsed = 0.0
+        self.doors_open = False
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_v:
+            self.doors_open = not self.doors_open
         elif event.type == pygame.MOUSEWHEEL:
             self.camera.zoom_by(event.y * 0.15)
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -49,4 +52,5 @@ class Game:
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)
-        self.renderer.draw_scene(surface, self.line, self.train, self.camera, self.elapsed)
+        self.renderer.draw_scene(surface, self.line, self.train, self.camera, self.elapsed,
+                                 doors_open=self.doors_open)

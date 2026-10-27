@@ -47,6 +47,72 @@ class Renderer:
                 cache[key] = pygame.transform.smoothscale(image, size)
         return cache[key]
 
+    def _draw_doors(self, sprite, source_image, vehicle_width, vehicle_height, is_loco, is_rear_cab=False):
+        """Draw animated door leaves on passenger cars and both cab cars."""
+        if self.door_left_image is None or self.door_right_image is None:
+            return
+
+        source_width, source_height = source_image.get_size()
+        sx = vehicle_width / source_width
+        sy = vehicle_height / source_height
+        amount = self.door_open_amount
+
+        if is_loco:
+            # Door openings on the front cab sprite.
+            openings = ((373, 81, 553, 322), (939, 81, 1119, 322),
+                        (1433, 81, 1613, 322), (1897, 81, 2077, 322))
+            if is_rear_cab:
+                openings = tuple(
+                    (source_width - x2, y1, source_width - x1, y2)
+                    for x1, y1, x2, y2 in reversed(openings)
+                )
+            for x1, y1, x2, y2 in openings:
+                door_height = max(1, round((y2 - y1) * sy))
+                left_width = max(1, round(91 * sx))
+                right_width = max(1, round(90 * sx))
+                left_door = pygame.transform.smoothscale(
+                    self.door_left_image, (left_width, door_height)
+                )
+                right_door = pygame.transform.smoothscale(
+                    self.door_right_image, (right_width, door_height)
+                )
+                sprite.blit(left_door, (
+                    round(x1 * sx - left_door.get_width() * amount),
+                    round(y1 * sy)
+                ))
+                sprite.blit(right_door, (
+                    round((x2 - 90) * sx + right_door.get_width() * amount),
+                    round(y1 * sy)
+                ))
+        else:
+            # Passenger-car door locations: upper and lower x coordinates
+            # supplied for each opening. The two leaves slide apart from
+            # the opening's upper/lower x positions as the doors open.
+            top_xs = (171, 725, 1261, 1815)
+            bottom_xs = (346, 900, 1436, 1990)
+            if is_rear_cab:
+                top_xs = tuple(source_width - x for x in reversed(bottom_xs))
+                bottom_xs = tuple(source_width - x for x in reversed(top_xs))
+            door_y = 70
+            door_height = max(1, round((298 - door_y) * sy))
+            left_width = max(1, round(90 * sx))
+            right_width = max(1, round(90 * sx))
+            left_door = pygame.transform.smoothscale(
+                self.door_left_image, (left_width, door_height)
+            )
+            right_door = pygame.transform.smoothscale(
+                self.door_right_image, (right_width, door_height)
+            )
+            for top_x, bottom_x in zip(top_xs, bottom_xs):
+                sprite.blit(left_door, (
+                    round(top_x * sx - left_door.get_width() * amount),
+                    round(door_y * sy)
+                ))
+                sprite.blit(right_door, (
+                    round((bottom_x - 90) * sx + right_door.get_width() * amount),
+                    round(door_y * sy)
+                ))
+
     @staticmethod
     def _track_offset(world_x):
         """Smooth, shallow test-track rises and dips, measured in world metres."""
@@ -208,17 +274,11 @@ class Renderer:
             if vehicle_x + vehicle_width >= -loco_width and vehicle_x <= width + loco_width:
                 if vehicle_image is not None:
                     sprite = pygame.transform.smoothscale(vehicle_image, (max(1, vehicle_width), max(1, loco_height)))
-                    if wagon.is_loco and wagon.index == 0 and self.door_left_image is not None and self.door_right_image is not None:
-                        source_width, source_height = vehicle_image.get_size()
-                        sx = vehicle_width / source_width
-                        sy = loco_height / source_height
-                        openings = ((373, 81, 553, 322), (939, 81, 1119, 322), (1433, 81, 1613, 322), (1897, 81, 2077, 322))
-                        for x1, y1, x2, y2 in openings:
-                            left_door = pygame.transform.smoothscale(self.door_left_image, (max(1, round(91 * sx)), max(1, round(243 * sy))))
-                            right_door = pygame.transform.smoothscale(self.door_right_image, (max(1, round(90 * sx)), max(1, round(243 * sy))))
-                            amount = self.door_open_amount
-                            sprite.blit(left_door, (round(x1 * sx - left_door.get_width() * amount), round(y1 * sy)))
-                            sprite.blit(right_door, (round((x2 - 90) * sx + right_door.get_width() * amount), round(y1 * sy)))
+                    if wagon.is_loco or not wagon.is_loco:
+                        self._draw_doors(
+                            sprite, vehicle_image, vehicle_width, loco_height,
+                            is_loco=wagon.is_loco, is_rear_cab=is_rear_cab
+                        )
                     center_x = vehicle_x + vehicle_width / 2
                     center_y = rail_y_at(center_x)
                     surface.blit(sprite, (round(vehicle_x), round(center_y - loco_height + 4)))

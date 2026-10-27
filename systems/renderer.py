@@ -56,61 +56,6 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    def _draw_train_sprite(self, surface, image, scaled_width, scaled_height,
-                           left_axle_ratio, right_axle_ratio, axle_y_ratio,
-                           left_x, right_x, left_y, right_y, vehicle_key, frame_dt,
-                           doors_open=False, show_doors=False, angle_override=None):
-        """Rotate a scaled train sprite and anchor its axle midpoint to the rails."""
-        import math
-        if image is None:
-            return
-        sprite = pygame.transform.smoothscale(image, (max(1, scaled_width), max(1, scaled_height)))
-        if show_doors and self.door_left_image is not None and self.door_right_image is not None:
-            source_width, source_height = image.get_size()
-            sx = scaled_width / source_width
-            sy = scaled_height / source_height
-            # Door coordinates are measured on the original 81-760 locomotive texture.
-            openings = ((373, 81, 553, 322), (939, 81, 1119, 322),
-                        (1433, 81, 1613, 322), (1897, 81, 2077, 322))
-            for x1, y1, x2, y2 in openings:
-                opening_width = x2 - x1
-                opening_height = y2 - y1
-                left_width = 91
-                right_width = 90
-                left_height = 243
-                right_height = 243
-                left_door = pygame.transform.smoothscale(
-                    self.door_left_image, (max(1, round(left_width * sx)),
-                                           max(1, round(left_height * sy))))
-                right_door = pygame.transform.smoothscale(
-                    self.door_right_image, (max(1, round(right_width * sx)),
-                                            max(1, round(right_height * sy))))
-                # The leaves slide away from the centre of the doorway.
-                amount = self.door_open_amount if doors_open else 0.0
-                left_x = round(x1 * sx - left_door.get_width() * amount)
-                right_x = round((x2 - right_width) * sx + right_door.get_width() * amount)
-                door_y = round(y1 * sy)
-                sprite.blit(left_door, (left_x, door_y))
-                sprite.blit(right_door, (right_x, door_y))
-        dx = right_x - left_x
-        dy = right_y - left_y
-        target_angle = (angle_override if angle_override is not None else
-                        -math.degrees(math.atan2(dy, max(1e-6, dx))))
-        previous_angle = self.vehicle_angles.get(vehicle_key, target_angle)
-        angle_delta = (target_angle - previous_angle + 180.0) % 360.0 - 180.0
-        smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
-        angle = previous_angle + angle_delta * smoothing
-        self.vehicle_angles[vehicle_key] = angle
-        rotated = pygame.transform.rotozoom(sprite, angle, 1.0)
-        source_mid_x = ((left_axle_ratio + right_axle_ratio) / 2.0 - 0.5) * scaled_width
-        source_mid_y = (axle_y_ratio - 0.5) * scaled_height
-        rotated_offset = pygame.math.Vector2(source_mid_x, source_mid_y).rotate(angle)
-        target_mid_x = (left_x + right_x) / 2.0
-        target_mid_y = (left_y + right_y) / 2.0
-        draw_x = round(target_mid_x - rotated_offset.x - rotated.get_width() / 2.0)
-        draw_y = round(target_mid_y - rotated_offset.y - rotated.get_height() / 2.0)
-        surface.blit(rotated, (draw_x, draw_y))
-
     def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False):
         width, height = surface.get_size()
         if self.last_render_time is None:
@@ -262,73 +207,57 @@ class Renderer:
         loco_width = max(1, round(train.loco_length_m * scale))
         car_width = max(1, round(train.car_length_m * scale))
 
-        # Treat the whole consist as one connected train: calculate a single
-        # orientation from the rails across the full train, not one per car.
-        consist_left_x = loco_x
-        consist_right_x = loco_x + train.consist_length_m * scale
-        consist_dx = max(1.0, consist_right_x - consist_left_x)
-        consist_dy = rail_y_at(consist_right_x) - rail_y_at(consist_left_x)
-        target_consist_angle = -math.degrees(math.atan2(consist_dy, consist_dx))
-        previous_consist_angle = self.vehicle_angles.get("consist", target_consist_angle)
-        angle_delta = (target_consist_angle - previous_consist_angle + 180.0) % 360.0 - 180.0
-        angle_smoothing = 1.0 - math.exp(-frame_dt / 0.20) if frame_dt > 0 else 1.0
-        consist_angle = previous_consist_angle + angle_delta * angle_smoothing
-        self.vehicle_angles["consist"] = consist_angle
         loco_height = (self._scaled_sprite(self.loco_image, loco_width).get_height()
                        if self._scaled_sprite(self.loco_image, loco_width) is not None else 48)
-        car = self._scaled_sprite(self.car_image, car_width, loco_height)
-        loco_src_w, loco_src_h = self.loco_image.get_size() if self.loco_image is not None else (1, 1)
-        left_ratio, right_ratio = 499 / loco_src_w, 1902 / loco_src_w
-        axle_y_ratio = 464 / loco_src_h
 
-        # Eight vehicles: leading cab, six passenger cars, and a reversed cab at the rear.
+        # Draw the consist using fixed world-space car slots. Do not independently
+        # anchor each sprite to wheel pixels: that made transparent margins and
+        # rotated bounding boxes create zoom-dependent gaps between vehicles.
         vehicle_x = loco_x
         for wagon in train.wagons:
             vehicle_width = loco_width if wagon.is_loco else car_width
             vehicle_image = self.loco_image if wagon.is_loco else self.car_image
-            if wagon.is_loco and wagon.index == len(train.wagons) - 1 and vehicle_image is not None:
+            is_rear_cab = wagon.is_loco and wagon.index == len(train.wagons) - 1
+            if is_rear_cab and vehicle_image is not None:
                 vehicle_image = pygame.transform.flip(vehicle_image, True, False)
-            # Skip off-screen wagons before doing expensive sprite scaling and rotation.
-            if vehicle_x + vehicle_width < -loco_width or vehicle_x > width + loco_width:
-                vehicle_x += vehicle_width
-                continue
-            if vehicle_image is not None:
-                if wagon.is_loco:
-                    src_w, src_h = vehicle_image.get_size()
-                    if wagon.index == len(train.wagons) - 1:
-                        vehicle_left_ratio, vehicle_right_ratio = 1 - right_ratio, 1 - left_ratio
-                    else:
-                        vehicle_left_ratio, vehicle_right_ratio = left_ratio, right_ratio
-                    left_x = vehicle_x + vehicle_left_ratio * vehicle_width
-                    right_x = vehicle_x + vehicle_right_ratio * vehicle_width
-                    left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
-                    self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
-                                            vehicle_left_ratio, vehicle_right_ratio,
-                                            axle_y_ratio, left_x, right_x, left_y, right_y,
-                                            f"loco_{wagon.index}", frame_dt,
-                                            doors_open=doors_open,
-                                            show_doors=(wagon.index == 0),
-                                            angle_override=consist_angle)
+
+            if vehicle_x + vehicle_width >= -loco_width and vehicle_x <= width + loco_width:
+                if vehicle_image is not None:
+                    sprite = pygame.transform.smoothscale(
+                        vehicle_image, (max(1, vehicle_width), max(1, loco_height)))
+                    if wagon.is_loco and wagon.index == 0 and self.door_left_image is not None and self.door_right_image is not None:
+                        source_width, source_height = vehicle_image.get_size()
+                        sx = vehicle_width / source_width
+                        sy = loco_height / source_height
+                        openings = ((373, 81, 553, 322), (939, 81, 1119, 322),
+                                    (1433, 81, 1613, 322), (1897, 81, 2077, 322))
+                        for x1, y1, x2, y2 in openings:
+                            left_door = pygame.transform.smoothscale(
+                                self.door_left_image, (max(1, round(91 * sx)),
+                                                       max(1, round(243 * sy))))
+                            right_door = pygame.transform.smoothscale(
+                                self.door_right_image, (max(1, round(90 * sx)),
+                                                        max(1, round(243 * sy))))
+                            amount = self.door_open_amount if doors_open else 0.0
+                            sprite.blit(left_door, (
+                                round(x1 * sx - left_door.get_width() * amount),
+                                round(y1 * sy)))
+                            sprite.blit(right_door, (
+                                round((x2 - 90) * sx + right_door.get_width() * amount),
+                                round(y1 * sy)))
+
+                    # One shared track height for adjacent cars keeps their bodies
+                    # connected; the track's visual bumps must not move cars apart.
+                    center_x = vehicle_x + vehicle_width / 2
+                    center_y = rail_y_at(center_x)
+                    draw_y = round(center_y - loco_height + 4)
+                    surface.blit(sprite, (round(vehicle_x), draw_y))
                 else:
-                    car_sprite = self._scaled_sprite(vehicle_image, vehicle_width, loco_height)
-                    if car_sprite is not None:
-                        src_w, src_h = self.car_image.get_size()
-                        left_ratio_car, right_ratio_car = 334 / src_w, 1898 / src_w
-                        left_x = vehicle_x + left_ratio_car * vehicle_width
-                        right_x = vehicle_x + right_ratio_car * vehicle_width
-                        left_y, right_y = rail_y_at(left_x), rail_y_at(right_x)
-                        self._draw_train_sprite(surface, vehicle_image, vehicle_width, loco_height,
-                                                left_ratio_car, right_ratio_car, 435 / src_h,
-                                                left_x, right_x, left_y, right_y,
-                                                f"wagon_{wagon.index}", frame_dt,
-                                                angle_override=consist_angle)
-            else:
-                left_y, right_y = rail_y_at(vehicle_x), rail_y_at(vehicle_x + vehicle_width)
-                pygame.draw.polygon(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196),
-                                    [(vehicle_x, left_y - 48),
-                                     (vehicle_x + vehicle_width, right_y - 48),
-                                     (vehicle_x + vehicle_width, right_y),
-                                     (vehicle_x, left_y)])
+                    center_x = vehicle_x + vehicle_width / 2
+                    center_y = rail_y_at(center_x)
+                    pygame.draw.rect(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196),
+                                     (round(vehicle_x), round(center_y - 48 + 4),
+                                      vehicle_width, 48))
             vehicle_x += vehicle_width
 
         # Driving HUD remains fixed to the screen.

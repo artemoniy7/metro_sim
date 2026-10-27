@@ -13,6 +13,7 @@ class AudioSystem:
     SOUND_FULL_VOLUME_DISTANCE_M = 12.0
     SOUND_CUTOFF_DISTANCE_M = 85.0
     ROLLING_MAX_VOLUME = 0.38
+    ENGINE_MAX_VOLUME = 0.32
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -27,6 +28,9 @@ class AudioSystem:
         self._car_image_width = 2048
         self.rolling_sounds = []
         self.rolling_channels = []
+        self.engine_sounds = []
+        self.engine_channels = []
+        self._engine_volumes = [0.0, 0.0, 0.0]
 
         try:
             if pygame.mixer.get_init() is None:
@@ -39,11 +43,23 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     self.rolling_sounds.append(None)
 
-            # Reserve dedicated channels so the continuous rolling loops do not
-            # interrupt short rail-joint effects.
+            # Use the clean 81-760 recordings: launch, middle-speed and high-speed layers.
+            engine_dir = rolling_dir / "engine"
+            for filename in (
+                "engine_loud_new.wav",
+                "engine_loud_new2_clean.wav",
+                "engine_loud_new2_clean_high.wav",
+            ):
+                try:
+                    self.engine_sounds.append(pygame.mixer.Sound(str(engine_dir / filename)))
+                except (pygame.error, OSError):
+                    self.engine_sounds.append(None)
+
+            # Dedicated channels keep rolling and engine loops separate from joint effects.
             pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
-            pygame.mixer.set_reserved(3)
+            pygame.mixer.set_reserved(6)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
+            self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
 
             sound_dir = rolling_dir / "joint"
             pattern = re.compile(r"joint_st_(\d{2})_([12])\.(?:wav|mp3)$", re.IGNORECASE)
@@ -148,9 +164,42 @@ class AudioSystem:
             if not channel.get_busy():
                 channel.play(sound, loops=-1)
 
+    def _update_engine(self, train, dt):
+        speed_kmh = abs(train.speed) * 3.6
+        # The motor is audible under traction; easing the volume down on coast/braking
+        # avoids an abrupt cut when the controller returns to zero.
+        traction = 0.0
+        if train.controller_notch > 0 and not train.emergency_brake_active:
+            traction = min(1.0, 0.35 + train.controller_notch * 0.16)
+
+        speed_weights = (
+            max(0.0, 1.0 - self._fade_in(speed_kmh, 22.0, 36.0)),
+            self._fade_in(speed_kmh, 10.0, 25.0)
+            * (1.0 - self._fade_in(speed_kmh, 45.0, 58.0)),
+            self._fade_in(speed_kmh, 35.0, 55.0),
+        )
+        smoothing = min(1.0, max(0.0, dt) * 3.5)
+
+        for index, (sound, channel, weight) in enumerate(zip(
+            self.engine_sounds, self.engine_channels, speed_weights
+        )):
+            if sound is None:
+                continue
+            target = weight * traction
+            self._engine_volumes[index] += (target - self._engine_volumes[index]) * smoothing
+            volume = self.ENGINE_MAX_VOLUME * self._engine_volumes[index]
+            channel.set_volume(volume)
+            if target > 0.01 and not channel.get_busy():
+                channel.play(sound, loops=-1)
+            elif target <= 0.01 and self._engine_volumes[index] < 0.015:
+                if channel.get_busy():
+                    channel.stop()
+                self._engine_volumes[index] = 0.0
+
     def update(self, train, dt, camera=None):
         speed = abs(train.speed)
         self._update_rolling(speed)
+        self._update_engine(train, dt)
         if not self.sounds:
             return
 

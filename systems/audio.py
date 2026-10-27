@@ -36,7 +36,7 @@ class AudioSystem:
         self.rolling_channels = []
         self.engine_sounds = []
         self.engine_channels = []
-        self._engine_volumes = [0.0, 0.0]
+        self._engine_volumes = [0.0, 0.0, 0.0]
         self.brake_sounds = {}
         self.brake_channel = None
         self.brake_channel_alt = None
@@ -59,12 +59,13 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     self.rolling_sounds.append(None)
 
-            # Layer the Rusich sound and async.wav at launch, then blend into
-            # the louder 81-760 motor recordings as speed increases.
+            # Rusich and async play together at low speed. Async fades out
+            # between 25 and 40 km/h; the next motor layer comes in at higher speed.
             engine_dir = rolling_dir / "engine"
             for filename in (
                 "engine_rusich.wav",
                 "async.wav",
+                "engine_loud_new.wav",
             ):
                 try:
                     self.engine_sounds.append(pygame.mixer.Sound(str(engine_dir / filename)))
@@ -300,7 +301,8 @@ class AudioSystem:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
         speed_weights = (
             max(0.0, 1.0 - speed_kmh / 22.0),
-            self._fade_in(speed_kmh, 8.0, 22.0),
+            1.0 - self._fade_in(speed_kmh, 25.0, 40.0),
+            self._fade_in(speed_kmh, 30.0, 48.0),
         )
         smoothing = min(1.0, max(0.0, dt) * 3.5)
         for index, (sound, channel, weight) in enumerate(zip(

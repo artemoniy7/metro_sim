@@ -145,7 +145,8 @@ class Renderer:
             x = int((line.path.total_length - float(station.get("position", 0)) - camera_x) * scale)
             if -160 < x < width + 160:
                 sy = rail_y_at(max(0, min(width - 1, x)))
-                pygame.draw.line(surface, (75, 125, 145), (x - 90, sy - 8), (x + 90, sy - 8), 4)
+                half_platform = int(float(station.get("length_m", 155)) * scale / 2)
+                pygame.draw.line(surface, (205, 55, 65), (x - half_platform, sy - 8), (x + half_platform, sy - 8), 5)
                 label = self.small_font.render(station.get("name", "Station"), True, (230, 234, 240))
                 surface.blit(label, (x - label.get_width() // 2, sy - 43))
                 distance = float(station.get("position", 0)) - train.position

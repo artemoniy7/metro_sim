@@ -3,20 +3,20 @@
   "display_name": "Ока",
   "wagons": 6,
   "max_speed_kmh": 80,
-  "acceleration_mps2": 0.9,
-  "brake_mps2": 1.15,
+  "acceleration_mps2": 1.0,
+  "brake_mps2": 1.2,
   "emergency_brake_mps2": 1.5,
   "jerk_mps3": 0.45,
   "traction_notches_mps2": [
-    0.25,
-    0.45,
-    0.68,
-    0.9
+    0.3,
+    0.85,
+    0.95,
+    1.0
   ],
   "brake_notches_mps2": [
     0.45,
-    0.8,
-    1.25
+    0.75,
+    1.2
   ],
   "loco_length_m": 20,
   "car_length_m": 19,

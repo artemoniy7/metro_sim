@@ -30,5 +30,5 @@ class Camera:
         self.x = max(
             0.0,
             cab_world_x - self.focus_screen_x / self.pixels_per_metre
-            - self.consist_offset_m,
+            + self.consist_offset_m,
         )

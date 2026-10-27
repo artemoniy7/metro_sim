@@ -137,7 +137,13 @@ class AudioSystem:
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""
         speed_kmh = abs(train.speed) * 3.6
-        braking = getattr(train, "brake_applied", False)
+        # Brake audio follows the driver command, not brake_applied: the train's
+        # physical brakes intentionally react after a delay, but the sound should
+        # begin as soon as the driver selects a brake notch.
+        braking = bool(
+            getattr(train, "emergency_brake_active", False)
+            or getattr(train, "controller_notch", 0) < 0
+        )
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
 
         if not braking:

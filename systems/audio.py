@@ -18,6 +18,7 @@ class AudioSystem:
     BRAKE_NEAR_STOP_SPEED_KMH = 8.0
     BRAKE_SOUND_MIN_SPEED_KMH = 2.0
     BRAKE_REPEAT_INTERVAL_S = 1.25
+    BRAKE_VOLUME_SMOOTHING = 2.5
 
     # Source-image x coordinates for the two points in each wheel pair.
     LOCO_PAIRS = ((345, 621), (1763, 2003))
@@ -38,6 +39,9 @@ class AudioSystem:
         self._engine_volumes = [0.0, 0.0, 0.0, 0.0]
         self.brake_sounds = {}
         self.brake_channel = None
+        self.brake_channel_alt = None
+        self._active_brake_channel = 0
+        self._brake_target_volume = 0.0
         self._was_braking = False
         self._played_near_stop = False
         self._last_brake_notch = 0
@@ -69,10 +73,10 @@ class AudioSystem:
                     self.engine_sounds.append(None)
 
             pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
-            pygame.mixer.set_reserved(7)
+            pygame.mixer.set_reserved(8)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
-            self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
-            self.brake_channel = pygame.mixer.Channel(6)
+            self.brake_channel = pygame.mixer.Channel(7)
+            self.brake_channel_alt = pygame.mixer.Channel(8)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -129,47 +133,74 @@ class AudioSystem:
             self.sounds = {}
 
     def _update_brakes(self, train, dt):
-        """Repeat brake squeals during braking and play the long squeal before stopping."""
+        """Play brake sounds only while the train is actually applying the brakes."""
         speed_kmh = abs(train.speed) * 3.6
-        braking = train.emergency_brake_active or train.controller_notch < 0
+        braking = getattr(train, "brake_applied", False)
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
 
         if not braking:
+            # Fade the last squeal out instead of letting it continue after braking.
+            for channel in (self.brake_channel, self.brake_channel_alt):
+                if channel is not None and channel.get_busy():
+                    channel.fadeout(250)
             self._was_braking = False
             self._played_near_stop = False
             self._last_brake_notch = 0
             self._brake_repeat_timer = 0.0
+            self._brake_target_volume = 0.0
             return
 
         sound_key = {1: "gentle", 2: "medium", 3: "strong"}.get(brake_notch, "strong")
-        # Play immediately when braking begins, and whenever the brake notch changes.
+        target_volume = self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3))
+        self._brake_target_volume = target_volume
+
         if not self._was_braking or brake_notch != self._last_brake_notch:
             sound = self.brake_sounds.get(sound_key)
             if sound is not None and speed_kmh > self.BRAKE_SOUND_MIN_SPEED_KMH:
-                sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
-                self.brake_channel.play(sound)
+                # Alternate channels so a new brake notch can blend in smoothly.
+                channels = (self.brake_channel, self.brake_channel_alt)
+                next_index = 1 - self._active_brake_channel
+                next_channel = channels[next_index]
+                current_channel = channels[self._active_brake_channel]
+                next_channel.stop()
+                next_channel.set_volume(0.0)
+                next_channel.play(sound)
+                next_channel.set_volume(target_volume)
+                if current_channel.get_busy():
+                    current_channel.fadeout(350)
+                self._active_brake_channel = next_index
             self._brake_repeat_timer = 0.0
             self._last_brake_notch = brake_notch
         else:
-            # A squeal is a short effect, so repeat it while the train is still braking.
             self._brake_repeat_timer += max(0.0, dt)
             if self._brake_repeat_timer >= self.BRAKE_REPEAT_INTERVAL_S:
                 sound = self.brake_sounds.get(sound_key)
                 if sound is not None and speed_kmh > self.BRAKE_NEAR_STOP_SPEED_KMH:
-                    sound.set_volume(self.BRAKE_VOLUME * (0.65 + 0.12 * min(brake_notch, 3)))
-                    self.brake_channel.play(sound)
+                    channels = (self.brake_channel, self.brake_channel_alt)
+                    channel = channels[self._active_brake_channel]
+                    channel.set_volume(target_volume)
+                    channel.play(sound)
                 self._brake_repeat_timer = 0.0
 
         self._was_braking = True
 
-        # Start the longer, louder squeal earlier, before the train reaches a standstill.
+        # Play the longer squeal near the stop, but only once per braking event.
         if (not self._played_near_stop
                 and self.BRAKE_SOUND_MIN_SPEED_KMH < speed_kmh <= self.BRAKE_NEAR_STOP_SPEED_KMH):
             key = random.choice(("near_stop_a", "near_stop_b"))
             sound = self.brake_sounds.get(key)
             if sound is not None:
-                sound.set_volume(min(1.0, self.BRAKE_VOLUME * 1.45))
-                self.brake_channel.play(sound)
+                channels = (self.brake_channel, self.brake_channel_alt)
+                next_index = 1 - self._active_brake_channel
+                next_channel = channels[next_index]
+                current_channel = channels[self._active_brake_channel]
+                next_channel.stop()
+                next_channel.set_volume(0.0)
+                next_channel.play(sound)
+                next_channel.set_volume(min(1.0, self.BRAKE_VOLUME * 1.45))
+                if current_channel.get_busy():
+                    current_channel.fadeout(350)
+                self._active_brake_channel = next_index
             self._played_near_stop = True
 
     def _play(self, group, hit, speed, distance_m):

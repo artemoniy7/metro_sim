@@ -38,6 +38,7 @@ class AudioSystem:
         self.engine_channels = []
         self._engine_volumes = [0.0, 0.0, 0.0]
         self.brake_sounds = {}
+        self.door_sound = None
         self.brake_channel = None
         self.brake_channel_alt = None
         self._active_brake_channel = 0
@@ -53,6 +54,10 @@ class AudioSystem:
                 pygame.mixer.init()
 
             rolling_dir = ASSETS_DIR / "sounds" / "train" / "81-760"
+            try:
+                self.door_sound = pygame.mixer.Sound(str(rolling_dir / "doors" / "door_close.wav"))
+            except (pygame.error, OSError):
+                self.door_sound = None
             for filename in ("rolling_low.wav", "rolling_50.wav", "rolling_70.wav"):
                 try:
                     self.rolling_sounds.append(pygame.mixer.Sound(str(rolling_dir / filename)))
@@ -133,6 +138,11 @@ class AudioSystem:
         except (pygame.error, OSError):
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
+
+    def play_door_sound(self):
+        """Play the available door sound for either opening or closing."""
+        if self.door_sound is not None:
+            self.door_sound.play()
 
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""

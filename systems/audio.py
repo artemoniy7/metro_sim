@@ -126,13 +126,14 @@ class AudioSystem:
 
     def _update_rolling(self, speed_mps):
         speed_kmh = speed_mps * 3.6
-        # Small overlap zones provide smooth crossfades around 50 and 70 km/h.
+        # Start each layer 10 km/h before its nominal range, then crossfade
+        # gradually so the next sound is already present before the threshold.
         volumes = (
-            self._fade_in(speed_kmh, 30.0, 35.0)
-            * (1.0 - self._fade_in(speed_kmh, 45.0, 55.0)),
-            self._fade_in(speed_kmh, 45.0, 55.0)
-            * (1.0 - self._fade_in(speed_kmh, 65.0, 75.0)),
-            self._fade_in(speed_kmh, 65.0, 75.0),
+            self._fade_in(speed_kmh, 20.0, 30.0)
+            * (1.0 - self._fade_in(speed_kmh, 40.0, 50.0)),
+            self._fade_in(speed_kmh, 40.0, 50.0)
+            * (1.0 - self._fade_in(speed_kmh, 60.0, 70.0)),
+            self._fade_in(speed_kmh, 60.0, 70.0),
         )
         for sound, channel, weight in zip(
             self.rolling_sounds, self.rolling_channels, volumes

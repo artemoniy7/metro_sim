@@ -21,6 +21,7 @@ class AudioSystem:
 
     def __init__(self):
         self.sounds = {}
+        self._group_speeds = {}
         self._last_position = None
         self._pair_sequences = {}
         self._groups = []
@@ -64,16 +65,22 @@ class AudioSystem:
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
 
             sound_dir = rolling_dir / "joint"
-            pattern = re.compile(r"joint_st_(\d{2})_([12])\.(?:wav|mp3)$", re.IGNORECASE)
+            # New exterior recordings encode the recording speed in the filename:
+            # joint_stl760_<group>_<hit>_<speed>.wav
+            pattern = re.compile(
+                r"joint_stl760_(\d+)_([12])_(\d+)\.(?:wav|mp3)$",
+                re.IGNORECASE,
+            )
             for path in sorted(sound_dir.iterdir()):
                 match = pattern.fullmatch(path.name)
                 if not match:
                     continue
-                group, hit = int(match.group(1)), int(match.group(2))
+                group, hit, recorded_speed = map(int, match.groups())
                 try:
                     sound = pygame.mixer.Sound(str(path))
                     sound.set_volume(0.0)
                     self.sounds[(group, hit)] = sound
+                    self._group_speeds[group] = recorded_speed
                 except (pygame.error, OSError):
                     continue
 
@@ -129,7 +136,18 @@ class AudioSystem:
         for joint_index in self._crossed_joints(previous_first, current_first):
             if not self._groups:
                 return
-            group = random.choice(self._groups)
+            # Prefer samples recorded near the train's current speed, while
+            # retaining variation between recordings at that speed.
+            speed_kmh = speed * 3.6
+            closest_difference = min(
+                abs(self._group_speeds[group] - speed_kmh)
+                for group in self._groups
+            )
+            candidates = [
+                group for group in self._groups
+                if abs(self._group_speeds[group] - speed_kmh) <= closest_difference + 5.0
+            ]
+            group = random.choice(candidates)
             self._pair_sequences[(pair_key, joint_index)] = group
             self._play(group, 1, speed, distance_m)
 

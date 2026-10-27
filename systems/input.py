@@ -15,6 +15,7 @@ class InputController:
         keys = pygame.key.get_pressed()
         train.throttle = 1.0 if keys[pygame.K_w] or keys[pygame.K_UP] else 0.0
         train.brake = 1.0 if keys[pygame.K_s] or keys[pygame.K_DOWN] else 0.0
+        train.emergency_brake_active = self.emergency
         if self.emergency:
             train.brake = 1.0
             train.throttle = 0.0

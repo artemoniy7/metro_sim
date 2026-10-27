@@ -43,10 +43,10 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     self.rolling_sounds.append(None)
 
-            # Use the clean 81-760 recordings: launch, middle-speed and high-speed layers.
+            # async.wav is the launch sound; the other two recordings cover higher speeds.
             engine_dir = rolling_dir / "engine"
             for filename in (
-                "engine_loud_new.wav",
+                "async.wav",
                 "engine_loud_new2_clean.wav",
                 "engine_loud_new2_clean_high.wav",
             ):
@@ -172,10 +172,10 @@ class AudioSystem:
         if train.controller_notch > 0 and not train.emergency_brake_active:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
 
-        # Keep the launch layer fully available from 0 km/h: the motor should
-        # be audible as soon as the driver applies traction, not only after rolling.
+        # async.wav starts with traction at 0 km/h and fades out linearly by 40 km/h.
+        # Higher-speed motor layers crossfade in independently.
         speed_weights = (
-            max(0.0, 1.0 - self._fade_in(speed_kmh, 22.0, 36.0)),
+            max(0.0, 1.0 - speed_kmh / 40.0),
             self._fade_in(speed_kmh, 10.0, 25.0)
             * (1.0 - self._fade_in(speed_kmh, 45.0, 58.0)),
             self._fade_in(speed_kmh, 35.0, 55.0),

@@ -30,6 +30,7 @@ class Train:
         self.position = 0.0
         self.speed = 0.0
         self.emergency_brake_active = False
+        self.manual_emergency_brake_active = False
         self.overspeed_emergency_active = False
         self.overspeed_timer = 0.0
         self.OVERSPEED_GRACE_S = 3.6
@@ -83,7 +84,7 @@ class Train:
 
         # A speed-enforcement emergency brake overrides every controller position.
         self.emergency_brake_active = bool(
-            self.emergency_brake_active or self.overspeed_emergency_active
+            self.manual_emergency_brake_active or self.overspeed_emergency_active
         )
         grade_acceleration = line.path.grade_acceleration(self.position)
         resistance = self.rolling_resistance + self.speed_resistance * self.speed

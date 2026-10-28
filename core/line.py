@@ -105,11 +105,21 @@ class Line:
         if next_station is not None:
             center = float(next_station.get("position", 0))
             half_length = float(next_station.get("length_m", 162)) / 2.0
-            distance_to_platform = center - half_length - train_position
-            if 0.0 <= distance_to_platform <= 50.0:
-                return 40, 1
-            if -half_length <= train_position - center <= half_length:
-                return 40, 1
+            station_start = center - half_length
+            station_end = center + half_length
+            distance_to_platform = station_start - train_position
+
+            # Station speed profile:
+            # 70 km/h farther out, 60 km/h on approach and through the
+            # first half, then 40 km/h from the station midpoint to its end.
+            if station_start <= train_position <= station_end:
+                if train_position >= center:
+                    return 40, 1
+                return 60, 1
+            if 0.0 <= distance_to_platform <= 300.0:
+                return 60, 1
+            if 300.0 < distance_to_platform <= 600.0:
+                return 70, 2
 
         block_count = max(1, int((self.path.total_length + self.PASSIVE_SIGNAL_SPACING_M - 1)
                                  // self.PASSIVE_SIGNAL_SPACING_M))

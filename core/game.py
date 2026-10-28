@@ -40,10 +40,12 @@ class Game:
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.bot_number += 1
-        # Give every dispatched train its own initial slot. Previously each
-        # dispatch used player_position + 1200 m, so all bots spawned together.
-        start_position = 300.0 + (self.bot_number - 1) * 1400.0
-        start_position = min(start_position, max(300.0, self.line.path.total_length - 2500.0))
+        # Keep the first bot on the line ahead of the player. Later bots enter
+        # service at Altufyevo (the first station), as requested.
+        if self.bot_number == 1:
+            start_position = 300.0
+        else:
+            start_position = float(self.line.stations[0].get("position", 0.0))
         bot = BotTrain(train_data, start_position=start_position)
         bot.train.display_name = f"Состав {self.bot_number}"
         self.bot_trains.append(bot)
@@ -101,13 +103,13 @@ class Game:
                     and bot.train.position >= self.line.path.total_length - 0.5):
                 # Remove the train from the terminus and put it at the back of
                 # the service queue. The player's own train is never recycled.
-                self.bot_trains.remove(bot)
-                # Recycle this train to its own slot, rather than placing
-                # every returning train at the player's current position.
                 slot_index = self.bot_trains.index(bot)
-                bot.train.position = min(
-                    300.0 + slot_index * 1400.0,
-                    max(300.0, self.line.path.total_length - 2500.0),
+                self.bot_trains.remove(bot)
+                # Re-enter at Altufyevo, with the first bot kept as the
+                # exception. Other returning bots join the queue there.
+                bot.train.position = (
+                    300.0 if slot_index == 0
+                    else float(self.line.stations[0].get("position", 0.0))
                 )
                 bot.train.speed = 0.0
                 bot.train.acceleration_state = 0.0

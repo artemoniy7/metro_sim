@@ -13,6 +13,7 @@ class Line:
         self.path = TrackPath(data.get("points", [[0, 350], [500, 350], [1000, 350], [1600, 350]]))
         self.stations = sorted(data.get("stations", []), key=lambda item: float(item.get("position", 0)))
         self.signals = []
+        self.traffic_trains = []
         self._create_signals()
 
     def _create_signals(self):
@@ -69,11 +70,15 @@ class Line:
         next physical signal acting as the far boundary). A block is released
         only when the train's rear-most wheel point passes its far boundary.
         """
-        if hasattr(train, "position"):
-            front_point = float(train.position) + float(train.loco_length_m)
-            rear_point = front_point - float(train.consist_length_m)
-        else:
-            front_point = rear_point = float(train)
+        trains = list(train) if isinstance(train, (list, tuple)) else [train]
+        occupied_ranges = []
+        for item in trains:
+            if hasattr(item, "position"):
+                front = float(item.position) + float(item.loco_length_m)
+                rear = front - float(item.consist_length_m)
+            else:
+                front = rear = float(item)
+            occupied_ranges.append((front, rear))
 
         operational = sorted(
             (signal for signal in self.signals if signal.operational),
@@ -94,25 +99,30 @@ class Line:
 
             # Red while any part of the train occupies the block. Never turn
             # a signal green merely because the train passed its own pole.
-            occupied = front_point >= block_start and rear_point < block_end
+            occupied = any(
+                front >= block_start and rear < block_end
+                for front, rear in occupied_ranges
+            )
             if occupied:
                 signal.set_aspect("red")
             else:
                 signal.set_aspect("green")
 
         # Entry signals show a restrictive approach aspect before the platform.
-        next_station = next((
-            station for station in self.stations
-            if float(station.get("position", 0)) >= front_point
-        ), None)
-        if next_station is not None:
-            center = float(next_station.get("position", 0))
-            half_length = float(next_station.get("length_m", 162)) / 2.0
-            distance_to_platform = center - half_length - front_point
-            if 0.0 <= distance_to_platform <= 50.0:
-                for signal in operational:
-                    if signal.kind == "station_entry" and signal.position >= front_point:
-                        signal.set_aspect("yellow")
+        # Show an approach aspect for any train nearing a station.
+        for front_point, _ in occupied_ranges:
+            next_station = next((
+                station for station in self.stations
+                if float(station.get("position", 0)) >= front_point
+            ), None)
+            if next_station is not None:
+                center = float(next_station.get("position", 0))
+                half_length = float(next_station.get("length_m", 162)) / 2.0
+                distance_to_platform = center - half_length - front_point
+                if 0.0 <= distance_to_platform <= 50.0:
+                    for signal in operational:
+                        if signal.kind == "station_entry" and signal.position >= front_point:
+                            signal.set_aspect("yellow")
 
     def block_indication(self, train_position):
         """Return the simplified ALS-ARS indication in km/h and free block count."""
@@ -149,4 +159,23 @@ class Line:
             return 70, blocks_ahead
         if blocks_ahead == 1:
             return 60, blocks_ahead
+        ahead_distances = [
+            float(other.position) - float(train_position)
+            for other in self.traffic_trains
+            if hasattr(other, "position")
+            and float(other.position) > float(train_position) + 1.0
+        ]
+        if ahead_distances:
+            gap = min(ahead_distances)
+            if gap < 120.0:
+                traffic_limit = 0
+            elif gap < 275.0:
+                traffic_limit = 40
+            elif gap < 550.0:
+                traffic_limit = 60
+            elif gap < 825.0:
+                traffic_limit = 70
+            else:
+                traffic_limit = 80
+            return min(traffic_limit, 80), max(0, int(gap // self.PASSIVE_SIGNAL_SPACING_M))
         return 0, blocks_ahead

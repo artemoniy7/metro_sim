@@ -19,6 +19,21 @@ class Renderer:
         # light.png is the signal sprite sheet; signal heads are drawn with
         # simple lamp overlays so inactive conventional signals stay dark.
         self.signal_image = self._load_sprite(ASSETS_DIR / "track" / "light.png")
+        self.signal_heads = {}
+        if self.signal_image is not None:
+            # The supplied atlas has two-lamp and three-lamp heads at the
+            # coordinates provided for light.png. Crop the housing; the
+            # illuminated aspects are overlaid dynamically below.
+            atlas_w, atlas_h = self.signal_image.get_size()
+            crops = {
+                2: (385, 60, 90, 165),   # lamps near (437, 101) and (437, 190)
+                3: (315, 405, 95, 350),  # lamps near (363, 451), (363, 585), (363, 724)
+            }
+            for lamp_count, (cx, cy, cw, ch) in crops.items():
+                if cx >= 0 and cy >= 0 and cx + cw <= atlas_w and cy + ch <= atlas_h:
+                    self.signal_heads[lamp_count] = self.signal_image.subsurface(
+                        (cx, cy, cw, ch)
+                    ).copy()
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
         self._station_tile_cache = {}

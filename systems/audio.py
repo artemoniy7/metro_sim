@@ -273,8 +273,12 @@ class AudioSystem:
         """Repeat the overspeed alarm until speed is legal or the trip is reset."""
         limit = getattr(train, "current_speed_limit_mps", train.max_speed)
         overspeed = abs(train.speed) > limit
-        should_beep = overspeed and (
-            getattr(train, "overspeed_timer", 0.0) > 0.0
+        # Once an overspeed trip triggers, keep the alarm sounding through the
+        # full stop. It is silenced only after the driver completes the reset
+        # procedure (stop + T3 + B), not merely because speed has fallen.
+        should_beep = (
+            overspeed
+            or getattr(train, "overspeed_timer", 0.0) > 0.0
             or getattr(train, "overspeed_emergency_active", False)
         )
         if should_beep and not self.overspeed_ring_active:

@@ -163,7 +163,8 @@ class AudioSystem:
                 group, hit, recorded_speed = map(int, match.groups())
                 try:
                     sound = pygame.mixer.Sound(str(path))
-                    sound.set_volume(0.0)
+                    # Set volume on the playback channel in _play(); setting the
+                    # Sound object's volume to zero here mutes it permanently.
                     self.sounds[(group, hit)] = sound
                     self._group_speeds[group] = recorded_speed
                 except (pygame.error, OSError):

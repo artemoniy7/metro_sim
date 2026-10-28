@@ -147,10 +147,11 @@ class Train:
                 if self.controller_notch > 0 and not self.doors_open and self.brake_release_timer <= 0.0:
                     index = min(len(self.traction_notches) - 1, self.controller_notch - 1)
                     traction_acceleration = self.traction_notches[index]
-                    # Traction weakens as speed rises, but grade and resistance stay active.
+                    # Traction fades strongly at high speed. This makes the last
+                    # 10 km/h before top speed take noticeably longer to gain.
                     speed_kmh = self.speed * 3.6
                     high_speed_fade = max(0.0, min(1.0, (speed_kmh - 40.0) / 40.0))
-                    traction_acceleration *= 1.0 - 0.45 * high_speed_fade
+                    traction_acceleration *= 1.0 - 0.92 * high_speed_fade
                     target_acceleration += traction_acceleration
                 if self.speed >= permitted_speed:
                     target_acceleration = min(0.0, target_acceleration)

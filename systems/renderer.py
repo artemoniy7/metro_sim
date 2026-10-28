@@ -19,8 +19,9 @@ class Renderer:
         # Transparent signal sprite; lamp coordinates are in source-image pixels.
         self.signal_image = self._load_sprite(ASSETS_DIR / "track" / "light.png")
         self.signal_lamp_points = {
-            2: ((52, 41), (52, 130)),
-            3: ((48, 46), (48, 180), (48, 319)),
+            # Lamp centers in the full 1024x1536 atlas.
+            2: ((437, 101), (437, 190)),
+            3: ((363, 451), (363, 585), (363, 724)),
         }
         self.signal_heads = {}
         if self.signal_image is not None:
@@ -302,14 +303,14 @@ class Renderer:
                 pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
                 # A real signal head is only a small part of the 1024x1536 atlas.
                 # Keep its world size modest and scale the complete crop uniformly.
-                head_height = max(9, min(28, round(1.8 * scale)))
+                head_height = max(6, min(16, round(0.85 * scale)))
                 head_y = sy - head_height - max(2, round(0.25 * scale))
                 pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), max(1, round(0.12 * scale)))
 
                 head_sprite = self.signal_heads.get(signal.lamp_count)
                 if head_sprite is not None:
                     source_w, source_h = head_sprite.get_size()
-                    target_h = head_height
+                    target_h = max(7, min(16, head_height))
                     target_w = max(1, round(source_w * target_h / source_h))
                     sprite = pygame.transform.smoothscale(head_sprite, (target_w, target_h))
                     # The atlas points to the LEFT; flip it so lamps face the approaching train on the RIGHT.
@@ -328,7 +329,6 @@ class Renderer:
                             glow = pygame.Surface((target_w, target_h), pygame.SRCALPHA)
                             original_points = self.signal_lamp_points[signal.lamp_count]
                             lamp_x, lamp_y = original_points[active_lamp]
-                            # Points are local to each crop, then mirrored with the texture.
                             crop_x, crop_y, crop_w, crop_h = (
                                 (385, 60, 90, 165) if signal.lamp_count == 2
                                 else (315, 405, 95, 350)

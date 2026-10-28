@@ -73,9 +73,13 @@ class Train:
         limit_kmh = limit * 3.6
         speed_kmh = abs(self.speed) * 3.6
 
-        # The automatic speed controller permits only a 1 km/h overshoot.
-        # The driver must bring the train back below the posted limit within 3.6 s.
-        if not self.overspeed_emergency_active:
+        # Overspeed emergency trip is active in T1 (or when not using
+        # stronger service braking). Selecting T2/T3 suppresses the emergency
+        # trip because the driver is already applying stronger service braking.
+        stronger_service_braking = self.controller_notch <= -2
+        if stronger_service_braking:
+            self.overspeed_timer = 0.0
+        elif not self.overspeed_emergency_active:
             if speed_kmh > limit_kmh:
                 self.overspeed_timer += dt
                 if self.overspeed_timer >= self.OVERSPEED_GRACE_S:

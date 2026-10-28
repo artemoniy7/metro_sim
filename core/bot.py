@@ -108,5 +108,33 @@ class BotTrain:
             else:
                 train.controller_notch = 0
 
+        # Hard following-distance protection: ALS-ARS target speeds alone
+        # are not enough to prevent a bot from running into a stopped train.
+        # Use the nearest train ahead and calculate a safe approach speed to
+        # its rear, leaving a small clearance for the full consist length.
+        nearest_gap = None
+        for other in getattr(line, "traffic_trains", []):
+            if other is train or not hasattr(other, "position"):
+                continue
+            other_position = float(other.position)
+            if other_position <= train.position + 1.0:
+                continue
+            other_length = float(getattr(other, "consist_length_m", 0.0))
+            gap = other_position - other_length - train.position
+            if nearest_gap is None or gap < nearest_gap:
+                nearest_gap = gap
+
+        if nearest_gap is not None:
+            safety_clearance = 18.0
+            usable_gap = max(0.0, nearest_gap - safety_clearance)
+            safe_speed = (2.0 * 0.65 * usable_gap) ** 0.5
+            if nearest_gap <= safety_clearance:
+                train.controller_notch = -3 if train.speed > 1.0 else 0
+                if train.speed <= 1.0 and nearest_gap <= safety_clearance:
+                    train.speed = 0.0
+                    train.acceleration_state = 0.0
+            elif train.speed > safe_speed:
+                train.controller_notch = -3 if train.speed > 4.0 else -2
+
         train.doors_open = False
         train.update(dt, line)

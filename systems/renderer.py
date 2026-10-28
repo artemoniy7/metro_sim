@@ -302,6 +302,12 @@ class Renderer:
                 pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
                 head_y = sy - 55
                 pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y - 4), 3)
+                head_sprite = self.signal_heads.get(signal.lamp_count)
+                if head_sprite is not None:
+                    sprite_height = 31 if signal.lamp_count == 2 else 48
+                    sprite_width = max(12, round(sprite_height * head_sprite.get_width() / head_sprite.get_height()))
+                    scaled_head = pygame.transform.smoothscale(head_sprite, (sprite_width, sprite_height))
+                    surface.blit(scaled_head, (x - sprite_width + 1, head_y - 5))
                 head_width = 15 if signal.lamp_count == 2 else 18
                 head_height = 27 if signal.lamp_count == 2 else 38
                 head_rect = pygame.Rect(x - head_width - 2, head_y - 2, head_width + 4, head_height + 4)

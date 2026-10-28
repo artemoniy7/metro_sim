@@ -61,9 +61,16 @@ class Game:
         self.audio.update(self.train, dt, self.camera)
         update_announcer = getattr(self.audio, "update_station_announcer", None)
         if callable(update_announcer):
-            update_announcer(self.train)
+            update_announcer(self.train, dt)
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)
-        self.renderer.draw_scene(surface, self.line, self.train, self.camera, self.elapsed,
-                                 doors_open=self.doors_open)
+        self.renderer.draw_scene(
+            surface, self.line, self.train, self.camera, self.elapsed,
+            doors_open=self.doors_open,
+            door_closing=getattr(self.audio, "door_ring_active", False),
+        )
+        if not self.doors_open and self.renderer.door_open_amount <= 0.0:
+            stop_door_ring = getattr(self.audio, "stop_door_ring", None)
+            if callable(stop_door_ring):
+                stop_door_ring()

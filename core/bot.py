@@ -37,6 +37,18 @@ class BotTrain:
         if dt <= 0:
             return
 
+        # Bot sounds should only be audible near the player's train. Fade them
+        # smoothly from full volume nearby to silence beyond 250 metres.
+        player_train = next(
+            (other for other in getattr(line, "traffic_trains", [])
+             if other is not train and not getattr(other, "is_bot", False)),
+            None,
+        )
+        sound_volume = 0.0
+        if player_train is not None:
+            distance = abs(float(player_train.position) - float(train.position))
+            sound_volume = max(0.0, min(1.0, (250.0 - distance) / 200.0))
+
         if self.state == "dwelling":
             train.controller_notch = 0
             train.speed = 0.0
@@ -50,8 +62,8 @@ class BotTrain:
                     train.doors_open = False
                     if audio is not None:
                         close_sound = getattr(audio, "play_door_sound", None)
-                        if callable(close_sound):
-                            close_sound()
+                        if callable(close_sound) and sound_volume > 0.01:
+                            close_sound(volume=sound_volume)
             if self.dwell_timer <= 0.0 and self.closed_for_departure:
                 self.state = "running"
                 self.target_station = None
@@ -107,8 +119,8 @@ class BotTrain:
                 self.dwell_timer = min(planned, max(1.1, seconds_to_dispatch - 3.0))
                 if audio is not None:
                     announce = getattr(audio, "toggle_station_announcer", None)
-                    if callable(announce):
-                        announce(train)
+                    if callable(announce) and sound_volume > 0.01:
+                        announce(train, volume=sound_volume)
                 return
         else:
             # Regulate speed on the open line; braking for stations takes priority.

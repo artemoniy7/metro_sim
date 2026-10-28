@@ -174,6 +174,9 @@ class Line:
         block_index = int(max(0.0, train_position) // self.PASSIVE_SIGNAL_SPACING_M)
         blocks_ahead = max(0, block_count - block_index - 1)
         if ahead_distances:
+            # Count complete clear blocks between this train and the next
+            # train, rather than reporting the number of blocks to the end
+            # of the entire line.
             base_limit = 80 if blocks_ahead >= 3 else 70 if blocks_ahead == 2 else 60 if blocks_ahead == 1 else 0
             return min(base_limit, traffic_limit), traffic_blocks
         if blocks_ahead >= 3:

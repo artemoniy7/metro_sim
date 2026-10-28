@@ -67,7 +67,7 @@ class Game:
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             toggle_announcer = getattr(self.audio, "toggle_station_announcer", None)
             if callable(toggle_announcer):
-                toggle_announcer(self.train)
+                toggle_announcer(self.train, self.line)
         elif event.type == pygame.MOUSEWHEEL:
             self.camera.zoom_by(event.y * 0.15)
         elif event.type == pygame.MOUSEBUTTONDOWN:

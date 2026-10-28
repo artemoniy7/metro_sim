@@ -33,6 +33,9 @@ class Game:
         self.bot_dispatch_interval = 120.0
         self.bot_dispatch_timer = 0.0
         self.bot_number = 0
+        # Put the first AI train into service immediately; subsequent trains
+        # are dispatched every two minutes.
+        self._dispatch_bot()
 
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})

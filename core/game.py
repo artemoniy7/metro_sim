@@ -2,6 +2,7 @@
 import pygame
 from settings import BACKGROUND_COLOR, WINDOW_SIZE, DATA_DIR
 from core.train import Train
+from core.bot import BotTrain
 from core.camera import Camera
 from core.line import Line
 from systems.loader import load_json
@@ -26,6 +27,19 @@ class Game:
         self.camera = Camera(WINDOW_SIZE, zoom=2.8)
         self.elapsed = 0.0
         self.doors_open = False
+        # The player's initial position is reserved; AI trains enter every
+        # two minutes and are recycled to the line start after the terminus.
+        self.bot_trains = []
+        self.bot_dispatch_interval = 120.0
+        self.bot_dispatch_timer = 0.0
+        self.bot_number = 0
+
+    def _dispatch_bot(self):
+        train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
+        self.bot_number += 1
+        bot = BotTrain(train_data, start_position=0.0)
+        bot.train.display_name = f"Состав {self.bot_number}"
+        self.bot_trains.append(bot)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -63,8 +77,36 @@ class Game:
         if self.doors_open and self.train.controller_notch > 0:
             self.train.controller_notch = 0
         self.train.doors_open = self.doors_open
+
+        self.bot_dispatch_timer += dt
+        if self.bot_dispatch_timer >= self.bot_dispatch_interval:
+            self.bot_dispatch_timer -= self.bot_dispatch_interval
+            self._dispatch_bot()
+
+        # ALS-ARS sees every train, including the player, before any train
+        # updates this frame. This keeps following trains from driving through.
+        self.line.traffic_trains = [self.train] + [bot.train for bot in self.bot_trains]
         self.train.update(dt, self.line)
-        self.line.update_signals(self.train)
+        for bot in list(self.bot_trains):
+            bot.update(dt, self.line, self.audio,
+                       seconds_to_dispatch=self.bot_dispatch_interval - self.bot_dispatch_timer)
+            if bot.train.position >= self.line.path.total_length - 0.5:
+                # Remove the train from the terminus and put it at the back of
+                # the service queue. The player's own train is never recycled.
+                self.bot_trains.remove(bot)
+                bot.train.position = 0.0
+                bot.train.speed = 0.0
+                bot.train.acceleration_state = 0.0
+                bot.train.controller_notch = 0
+                bot.state = "running"
+                bot.target_station = None
+                bot.dwell_timer = 0.0
+                bot.informer_started = False
+                bot.informer_timer = 0.0
+                bot.closed_for_departure = False
+                self.bot_trains.append(bot)
+        self.line.traffic_trains = [self.train] + [bot.train for bot in self.bot_trains]
+        self.line.update_signals(self.line.traffic_trains)
         self.camera.follow(self.train, self.line.path.total_length)
         self.audio.update(self.train, dt, self.camera)
         update_announcer = getattr(self.audio, "update_station_announcer", None)
@@ -77,6 +119,7 @@ class Game:
             surface, self.line, self.train, self.camera, self.elapsed,
             doors_open=self.doors_open,
             door_closing=getattr(self.audio, "door_ring_active", False),
+            other_trains=[bot.train for bot in self.bot_trains],
         )
         if not self.doors_open and self.renderer.door_open_amount <= 0.0:
             stop_door_ring = getattr(self.audio, "stop_door_ring", None)

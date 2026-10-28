@@ -148,7 +148,7 @@ class Train:
                     high_speed_fade = max(0.0, min(1.0, (speed_kmh - 40.0) / 40.0))
                     traction_acceleration *= 1.0 - 0.45 * high_speed_fade
                     target_acceleration += traction_acceleration
-                if self.speed >= limit:
+                if self.speed >= permitted_speed:
                     target_acceleration = min(0.0, target_acceleration)
                 change = self.jerk_limit * dt
                 self.acceleration_state += max(

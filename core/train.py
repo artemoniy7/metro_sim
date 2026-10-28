@@ -33,6 +33,11 @@ class Train:
         self.acceleration_state = 0.0
         self.brake_applied = False
         self._brake_command_timer = 0.0
+        self._was_brake_commanded = False
+        self.brake_release_timer = 0.0
+        self.BRAKE_RELEASE_SOUND_S = 1.5
+        self.TRACTION_DELAY_AFTER_RELEASE_S = 2.0
+        self.doors_open = False
         self.BRAKE_RESPONSE_DELAY_S = float(data.get("brake_response_delay_s", 0.0))
         # Small rolling/air resistance: noticeable over time, but not a hard brake.
         self.rolling_resistance = 0.012  # m/s² at low speed
@@ -66,11 +71,18 @@ class Train:
 
         # The train takes one second to react to a brake command.
         brake_commanded = self.emergency_brake_active or self.controller_notch < 0
+        if self._was_brake_commanded and not brake_commanded:
+            # Air-release sound (~1.5 s), followed by a 2 s traction delay.
+            self.brake_release_timer = (
+                self.BRAKE_RELEASE_SOUND_S + self.TRACTION_DELAY_AFTER_RELEASE_S
+            )
         if brake_commanded:
             self._brake_command_timer += dt
         else:
             self._brake_command_timer = 0.0
+        self._was_brake_commanded = brake_commanded
         self.brake_applied = brake_commanded and self._brake_command_timer >= self.BRAKE_RESPONSE_DELAY_S
+        self.brake_release_timer = max(0.0, self.brake_release_timer - dt)
 
         if self.brake_applied:
             if self.emergency_brake_active:
@@ -97,7 +109,7 @@ class Train:
                 self.acceleration_state = min(0.0, self.acceleration_state)
             else:
                 target_acceleration = natural_acceleration
-                if self.controller_notch > 0:
+                if self.controller_notch > 0 and not self.doors_open and self.brake_release_timer <= 0.0:
                     index = min(len(self.traction_notches) - 1, self.controller_notch - 1)
                     traction_acceleration = self.traction_notches[index]
                     # Traction weakens as speed rises, but grade and resistance stay active.

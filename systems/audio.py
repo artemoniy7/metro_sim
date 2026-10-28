@@ -48,6 +48,8 @@ class AudioSystem:
         self.door_sound = None
         self.door_ring_sound = None
         self.door_ring_channel = None
+        self.brake_release_sound = None
+        self.brake_release_channel = None
         self.door_ring_active = False
         self._door_ring_timer = 0.0
         self._door_ring_beeping = False
@@ -109,10 +111,18 @@ class AudioSystem:
             self.brake_channel_alt = pygame.mixer.Channel(7)
             self.station_announcement_channel = pygame.mixer.Channel(8)
             self.door_ring_channel = pygame.mixer.Channel(9)
+            self.brake_release_channel = pygame.mixer.Channel(10)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
             brake_dir = rolling_dir / "brake"
+            try:
+                self.brake_release_sound = pygame.mixer.Sound(
+                    str(brake_dir / "013_release.wav")
+                )
+            except (pygame.error, OSError):
+                self.brake_release_sound = None
+
             for key, filename in (
                 ("gentle", "brake_squeal1.wav"),
                 ("medium", "brake_squeal3.wav"),
@@ -262,11 +272,15 @@ class AudioSystem:
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
 
         if not braking:
-            # Fade once when the brake command is released; don't restart fadeout every frame.
+            # Brake-release air sound plays once when the driver releases the brake.
             if self._was_braking:
                 for channel in (self.brake_channel, self.brake_channel_alt):
                     if channel is not None and channel.get_busy():
                         channel.fadeout(250)
+                if self.brake_release_sound is not None and self.brake_release_channel is not None:
+                    self.brake_release_channel.stop()
+                    self.brake_release_channel.set_volume(0.85)
+                    self.brake_release_channel.play(self.brake_release_sound)
             self._brake_stop_fade_done = False
             self._was_braking = False
             self._played_near_stop = False

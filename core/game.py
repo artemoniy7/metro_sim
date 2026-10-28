@@ -40,12 +40,15 @@ class Game:
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.bot_number += 1
-        # Keep the first bot on the line ahead of the player. Later bots enter
-        # service at Altufyevo (the first station), as requested.
+        # Keep one bot farther down the line. All other bots queue just beyond
+        # Altufyevo's platform, spaced by roughly one train length so they do
+        # not spawn inside the player or inside one another.
+        first_station = self.line.stations[0]
+        station_position = float(first_station.get("position", 0.0))
         if self.bot_number == 1:
-            start_position = 300.0
+            start_position = min(2000.0, self.line.path.total_length - 2500.0)
         else:
-            start_position = float(self.line.stations[0].get("position", 0.0))
+            start_position = station_position + 175.0 + (self.bot_number - 2) * 180.0
         bot = BotTrain(train_data, start_position=start_position)
         bot.train.display_name = f"Состав {self.bot_number}"
         self.bot_trains.append(bot)
@@ -105,11 +108,12 @@ class Game:
                 # the service queue. The player's own train is never recycled.
                 slot_index = self.bot_trains.index(bot)
                 self.bot_trains.remove(bot)
-                # Re-enter at Altufyevo, with the first bot kept as the
-                # exception. Other returning bots join the queue there.
+                # Recycle into the same staggered queue beyond Altufyevo.
                 bot.train.position = (
-                    300.0 if slot_index == 0
+                    min(2000.0, self.line.path.total_length - 2500.0)
+                    if slot_index == 0
                     else float(self.line.stations[0].get("position", 0.0))
+                    + 175.0 + slot_index * 180.0
                 )
                 bot.train.speed = 0.0
                 bot.train.acceleration_state = 0.0

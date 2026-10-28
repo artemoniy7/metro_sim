@@ -37,7 +37,7 @@ class Game:
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.bot_number += 1
-        bot = BotTrain(train_data, start_position=0.0)
+        bot = BotTrain(train_data, start_position=300.0)
         bot.train.display_name = f"Состав {self.bot_number}"
         self.bot_trains.append(bot)
 
@@ -90,11 +90,12 @@ class Game:
         for bot in list(self.bot_trains):
             bot.update(dt, self.line, self.audio,
                        seconds_to_dispatch=self.bot_dispatch_interval - self.bot_dispatch_timer)
-            if bot.train.position >= self.line.path.total_length - 0.5:
+            if (bot.state != "dwelling"
+                    and bot.train.position >= self.line.path.total_length - 0.5):
                 # Remove the train from the terminus and put it at the back of
                 # the service queue. The player's own train is never recycled.
                 self.bot_trains.remove(bot)
-                bot.train.position = 0.0
+                bot.train.position = 300.0
                 bot.train.speed = 0.0
                 bot.train.acceleration_state = 0.0
                 bot.train.controller_notch = 0

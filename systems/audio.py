@@ -191,7 +191,8 @@ class AudioSystem:
     @staticmethod
     def _make_motor_fallback(base_hz, modulation_hz, brightness=0.5):
         """Synthesize a quiet loopable electric-motor bed if an asset is missing."""
-        sample_rate = 22050
+        mixer_format = pygame.mixer.get_init()
+        sample_rate = mixer_format[0] if mixer_format else 22050
         duration_s = 2.0
         sample_count = int(sample_rate * duration_s)
         frames = bytearray()

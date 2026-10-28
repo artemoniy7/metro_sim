@@ -125,7 +125,27 @@ class Line:
                             signal.set_aspect("yellow")
 
     def block_indication(self, train_position):
-        """Return the simplified ALS-ARS indication in km/h and free block count."""
+        """Return a speed code limited by stations and trains ahead."""
+        ahead_distances = [
+            float(other.position) - float(train_position)
+            for other in self.traffic_trains
+            if hasattr(other, "position")
+            and float(other.position) > float(train_position) + 1.0
+        ]
+        traffic_limit = 80
+        traffic_blocks = 99
+        if ahead_distances:
+            gap = min(ahead_distances)
+            traffic_blocks = max(0, int(gap // self.PASSIVE_SIGNAL_SPACING_M))
+            if gap < 120.0:
+                traffic_limit = 0
+            elif gap < 275.0:
+                traffic_limit = 40
+            elif gap < 550.0:
+                traffic_limit = 60
+            elif gap < 825.0:
+                traffic_limit = 70
+
         next_station = next((
             station for station in self.stations
             if float(station.get("position", 0)) >= train_position
@@ -142,12 +162,12 @@ class Line:
             # half, then 40 km/h from the midpoint to the platform end.
             if station_start <= train_position <= station_end:
                 if train_position >= center:
-                    return 40, 1
-                return 60, 1
+                    return min(40, traffic_limit), min(1, traffic_blocks)
+                return min(60, traffic_limit), min(1, traffic_blocks)
             if 0.0 <= distance_to_platform <= 50.0:
-                return 60, 1
+                return min(60, traffic_limit), min(1, traffic_blocks)
             if 50.0 < distance_to_platform <= 100.0:
-                return 70, 2
+                return min(70, traffic_limit), min(2, traffic_blocks)
 
         block_count = max(1, int((self.path.total_length + self.PASSIVE_SIGNAL_SPACING_M - 1)
                                  // self.PASSIVE_SIGNAL_SPACING_M))
@@ -159,23 +179,12 @@ class Line:
             return 70, blocks_ahead
         if blocks_ahead == 1:
             return 60, blocks_ahead
-        ahead_distances = [
-            float(other.position) - float(train_position)
-            for other in self.traffic_trains
-            if hasattr(other, "position")
-            and float(other.position) > float(train_position) + 1.0
-        ]
         if ahead_distances:
-            gap = min(ahead_distances)
-            if gap < 120.0:
-                traffic_limit = 0
-            elif gap < 275.0:
-                traffic_limit = 40
-            elif gap < 550.0:
-                traffic_limit = 60
-            elif gap < 825.0:
-                traffic_limit = 70
-            else:
-                traffic_limit = 80
-            return min(traffic_limit, 80), max(0, int(gap // self.PASSIVE_SIGNAL_SPACING_M))
+            return min(traffic_limit, 80), traffic_blocks
+        if blocks_ahead >= 3:
+            return min(80, traffic_limit), blocks_ahead
+        if blocks_ahead == 2:
+            return min(70, traffic_limit), blocks_ahead
+        if blocks_ahead == 1:
+            return min(60, traffic_limit), blocks_ahead
         return 0, blocks_ahead

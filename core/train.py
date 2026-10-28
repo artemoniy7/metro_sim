@@ -35,8 +35,8 @@ class Train:
         self._brake_command_timer = 0.0
         self._was_brake_commanded = False
         self.brake_release_timer = 0.0
-        self.BRAKE_RELEASE_SOUND_S = 3.0
-        self.TRACTION_DELAY_AFTER_RELEASE_S = 2.0
+        self.BRAKE_RELEASE_SOUND_S = 4.0
+        self.TRACTION_DELAY_AFTER_RELEASE_S = 1.5
         self.doors_open = False
         self.BRAKE_RESPONSE_DELAY_S = float(data.get("brake_response_delay_s", 0.0))
         # Small rolling/air resistance: noticeable over time, but not a hard brake.
@@ -72,7 +72,7 @@ class Train:
         # The train takes one second to react to a brake command.
         brake_commanded = self.emergency_brake_active or self.controller_notch < 0
         if self._was_brake_commanded and not brake_commanded:
-            # At a stop, play the 3 s release sound, then wait before allowing traction.
+            # At a stop, play the 4 s release sound, then wait 1.5 s before allowing traction.
             # When releasing the brakes while moving, neither sound nor extra delay is needed.
             if abs(self.speed) < 0.2 / 3.6:
                 self.brake_release_timer = (

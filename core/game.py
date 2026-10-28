@@ -64,7 +64,7 @@ class Game:
             self.train.controller_notch = 0
         self.train.doors_open = self.doors_open
         self.train.update(dt, self.line)
-        self.line.update_signals(self.train.position, self.train.speed)
+        self.line.update_signals(self.train)
         self.camera.follow(self.train, self.line.path.total_length)
         self.audio.update(self.train, dt, self.camera)
         update_announcer = getattr(self.audio, "update_station_announcer", None)

@@ -16,6 +16,9 @@ class Renderer:
         self.door_open_amount = 0.0
         self.door_indicator_phase = 0.0
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
+        # light.png is the signal sprite sheet; signal heads are drawn with
+        # simple lamp overlays so inactive conventional signals stay dark.
+        self.signal_image = self._load_sprite(ASSETS_DIR / "track" / "light.png")
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
         self._station_tile_cache = {}
@@ -278,11 +281,32 @@ class Renderer:
 
         for signal in line.signals:
             x = int((line.path.total_length - signal.position - camera_x) * scale)
-            if -20 < x < width + 20:
+            if -30 < x < width + 30:
                 sy = rail_y_at(max(0, min(width - 1, x)))
-                pygame.draw.line(surface, (85, 88, 94), (x, sy - 56), (x, sy - 1), 5)
-                pygame.draw.circle(surface, signal.ASPECTS[signal.aspect], (x, sy - 56), 8)
-                surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 10, sy - 66))
+                # All signals face left, toward the approaching train.
+                pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
+                head_y = sy - 55
+                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y - 4), 3)
+                head_width = 15 if signal.lamp_count == 2 else 18
+                head_height = 27 if signal.lamp_count == 2 else 38
+                head_rect = pygame.Rect(x - head_width - 2, head_y - 2, head_width + 4, head_height + 4)
+                pygame.draw.rect(surface, (20, 22, 26), head_rect, border_radius=4)
+                pygame.draw.rect(surface, pole_color, head_rect, 1, border_radius=4)
+
+                lamp_color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"])
+                if signal.lamp_count == 2:
+                    lamp_points = [(x - 10, head_y + 5), (x - 10, head_y + 18)]
+                else:
+                    lamp_points = [(x - 11, head_y + 5), (x - 11, head_y + 18), (x - 11, head_y + 31)]
+                for lamp_index, point in enumerate(lamp_points):
+                    color = lamp_color if signal.operational and lamp_index == 0 else (45, 47, 51)
+                    if signal.aspect == "yellow" and lamp_index == 1:
+                        color = lamp_color
+                    elif signal.aspect == "red" and lamp_index == 2:
+                        color = lamp_color
+                    pygame.draw.circle(surface, color, point, 4)
+                if signal.operational:
+                    surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 7, sy - 66))
 
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))
@@ -321,7 +345,8 @@ class Renderer:
         pygame.draw.rect(surface, (12, 15, 20), (16, 16, 430, 190), border_radius=8)
         surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
-        surface.blit(self.small_font.render(f"Ограничение: {speed_limit_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
+        surface.blit(self.small_font.render(f"АЛС-АРС: {train.als.indication_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
+        surface.blit(self.small_font.render(f"Свободно блоков: {train.als.free_blocks_ahead}", True, (170, 195, 215)), (30, 108))
         lever_color = (255, 180, 95) if train.controller_notch < 0 else (110, 220, 160)
         surface.blit(self.font.render(f"Ручка: {train.controller_label}", True, lever_color), (30, 115))
         surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 147))

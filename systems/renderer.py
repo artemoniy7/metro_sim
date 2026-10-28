@@ -19,9 +19,21 @@ class Renderer:
         # Transparent signal sprite; lamp coordinates are in source-image pixels.
         self.signal_image = self._load_sprite(ASSETS_DIR / "track" / "light.png")
         self.signal_lamp_points = {
-            2: ((437, 101), (437, 190)),
-            3: ((363, 451), (363, 585), (363, 724)),
+            2: ((52, 41), (52, 130)),
+            3: ((48, 46), (48, 180), (48, 319)),
         }
+        self.signal_heads = {}
+        if self.signal_image is not None:
+            atlas_w, atlas_h = self.signal_image.get_size()
+            signal_crops = {
+                2: (385, 60, 90, 165),
+                3: (315, 405, 95, 350),
+            }
+            for lamp_count, (cx, cy, cw, ch) in signal_crops.items():
+                if cx + cw <= atlas_w and cy + ch <= atlas_h:
+                    self.signal_heads[lamp_count] = self.signal_image.subsurface(
+                        (cx, cy, cw, ch)
+                    ).copy()
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
         self._station_tile_cache = {}
@@ -288,40 +300,37 @@ class Renderer:
                 sy = rail_y_at(max(0, min(width - 1, x)))
                 pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
                 head_height = max(18, min(64, round(5.0 * scale)))
-                head_width = max(10, min(34, round(2.1 * scale)))
                 head_y = sy - head_height - max(3, round(1.0 * scale))
                 pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), max(2, round(0.35 * scale)))
 
-                sprite_drawn = False
-                if self.signal_image is not None:
-                    source_w, source_h = self.signal_image.get_size()
-                    if source_w > 0 and source_h > 0:
-                        target_h = head_height
-                        target_w = max(1, round(source_w * target_h / source_h))
-                        sprite = pygame.transform.smoothscale(self.signal_image, (target_w, target_h))
-                        # Anchor the two-lamp sprite at its first lamp coordinate.
-                        anchor = self.signal_lamp_points.get(signal.lamp_count, ((437, 101),))[0]
-                        sprite_x = x - round(anchor[0] * target_w / source_w)
-                        sprite_y = head_y - round(anchor[1] * target_h / source_h)
-                        surface.blit(sprite, (sprite_x, sprite_y))
-                        points = self.signal_lamp_points.get(signal.lamp_count, ())
-                        if points and signal.operational and signal.aspect != "dark":
-                            lamp_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-                            color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"])
-                            for lamp_x, lamp_y in points:
-                                px = sprite_x + round(lamp_x * target_w / source_w)
-                                py = sprite_y + round(lamp_y * target_h / source_h)
-                                beam_len = max(12, round(8.0 * scale))
-                                beam_half = max(5, round(2.4 * scale))
-                                pygame.draw.polygon(lamp_surface, (*color, 72), [
-                                    (px, py), (px - beam_len, py - beam_half),
-                                    (px - beam_len, py + beam_half),
-                                ])
-                            surface.blit(lamp_surface, (0, 0))
-                        sprite_drawn = True
+                head_sprite = self.signal_heads.get(signal.lamp_count)
+                if head_sprite is not None:
+                    source_w, source_h = head_sprite.get_size()
+                    target_h = max(24, min(110, round((source_h / 165.0) * head_height)))
+                    target_w = max(1, round(source_w * target_h / source_h))
+                    sprite = pygame.transform.smoothscale(head_sprite, (target_w, target_h))
+                    sprite_x = x - round(52 * target_w / source_w)
+                    sprite_y = head_y - round((41 if signal.lamp_count == 2 else 46) * target_h / source_h)
+                    surface.blit(sprite, (sprite_x, sprite_y))
 
-                if not sprite_drawn:
-                    # Fallback head has fixed world dimensions and uses the same scale.
+                    # Add translucent triangular light beams at the actual lamp centers.
+                    points = self.signal_lamp_points.get(signal.lamp_count, ())
+                    if signal.operational and signal.aspect != "dark":
+                        lamp_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+                        color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"])
+                        for lamp_x, lamp_y in points:
+                            px = sprite_x + round(lamp_x * target_w / source_w)
+                            py = sprite_y + round(lamp_y * target_h / source_h)
+                            beam_len = max(12, round(8.0 * scale))
+                            beam_half = max(5, round(2.4 * scale))
+                            pygame.draw.polygon(lamp_surface, (*color, 72), [
+                                (px, py), (px - beam_len, py - beam_half),
+                                (px - beam_len, py + beam_half),
+                            ])
+                        surface.blit(lamp_surface, (0, 0))
+                else:
+                    # Fallback dimensions are in metres and scale uniformly with the camera.
+                    head_width = max(10, min(34, round(2.1 * scale)))
                     body = pygame.Rect(x - head_width, head_y, head_width, head_height)
                     pygame.draw.rect(surface, (20, 22, 26), body, border_radius=max(2, head_width // 5))
                     pygame.draw.rect(surface, pole_color, body, max(1, round(0.25 * scale)), border_radius=max(2, head_width // 5))

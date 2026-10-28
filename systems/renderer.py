@@ -14,6 +14,7 @@ class Renderer:
         self.door_left_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-door-left.png")
         self.door_right_image = self._load_sprite(ASSETS_DIR / "trains" / "81-760" / "81-760-door-right.png")
         self.door_open_amount = 0.0
+        self.door_indicator_phase = 0.0
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
@@ -113,6 +114,30 @@ class Renderer:
                     round(door_y * sy)
                 ))
 
+    def _draw_door_indicators(self, sprite, source_image, vehicle_width, vehicle_height,
+                               is_loco, is_rear_cab, elapsed, active):
+        if not active:
+            return
+        # Half a second lit, half a second dark.
+        if int(elapsed * 2.0) % 2 == 1:
+            return
+        source_width, source_height = source_image.get_size()
+        sx = vehicle_width / source_width
+        sy = vehicle_height / source_height
+        points = ((463, 75), (1030, 75), (1525, 75), (1990, 75)) if is_loco else (
+            (258, 65), (815, 65), (1349, 65), (1904, 65)
+        )
+        if is_rear_cab:
+            points = tuple((source_width - x, y) for x, y in reversed(points))
+        radius = max(2, round(7 * min(sx, sy)))
+        for x, y in points:
+            center = (round(x * sx), round(y * sy))
+            pygame.draw.circle(sprite, (70, 0, 0), center, radius + max(1, radius // 3))
+            pygame.draw.circle(sprite, (255, 25, 20), center, radius)
+            pygame.draw.circle(sprite, (255, 150, 140), (
+                center[0] - max(1, radius // 3), center[1] - max(1, radius // 3)
+            ), max(1, radius // 3))
+
     @staticmethod
     def _track_offset(world_x):
         """Smooth, shallow test-track rises and dips, measured in world metres."""
@@ -120,7 +145,7 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False):
+    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False):
         width, height = surface.get_size()
         if self.last_render_time is None:
             frame_dt = 1.0 / 60.0
@@ -274,11 +299,15 @@ class Renderer:
             if vehicle_x + vehicle_width >= -loco_width and vehicle_x <= width + loco_width:
                 if vehicle_image is not None:
                     sprite = pygame.transform.smoothscale(vehicle_image, (max(1, vehicle_width), max(1, loco_height)))
-                    if wagon.is_loco or not wagon.is_loco:
-                        self._draw_doors(
-                            sprite, vehicle_image, vehicle_width, loco_height,
-                            is_loco=wagon.is_loco, is_rear_cab=is_rear_cab
-                        )
+                    self._draw_doors(
+                        sprite, vehicle_image, vehicle_width, loco_height,
+                        is_loco=wagon.is_loco, is_rear_cab=is_rear_cab
+                    )
+                    self._draw_door_indicators(
+                        sprite, vehicle_image, vehicle_width, loco_height,
+                        is_loco=wagon.is_loco, is_rear_cab=is_rear_cab,
+                        elapsed=elapsed, active=door_closing
+                    )
                     center_x = vehicle_x + vehicle_width / 2
                     center_y = rail_y_at(center_x)
                     surface.blit(sprite, (round(vehicle_x), round(center_y - loco_height + 4)))

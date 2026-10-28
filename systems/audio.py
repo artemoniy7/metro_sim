@@ -50,6 +50,9 @@ class AudioSystem:
         self.door_ring_channel = None
         self.brake_release_sound = None
         self.brake_release_channel = None
+        self.overspeed_ring_sound = None
+        self.overspeed_ring_channel = None
+        self.overspeed_ring_active = False
         self.door_ring_active = False
         self._door_ring_timer = 0.0
         self._door_ring_beeping = False
@@ -112,6 +115,7 @@ class AudioSystem:
             self.station_announcement_channel = pygame.mixer.Channel(8)
             self.door_ring_channel = pygame.mixer.Channel(9)
             self.brake_release_channel = pygame.mixer.Channel(10)
+            self.overspeed_ring_channel = pygame.mixer.Channel(11)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -122,6 +126,12 @@ class AudioSystem:
                 )
             except (pygame.error, OSError):
                 self.brake_release_sound = None
+            try:
+                self.overspeed_ring_sound = pygame.mixer.Sound(
+                    str(brake_dir / "ring_ao.wav")
+                )
+            except (pygame.error, OSError):
+                self.overspeed_ring_sound = None
 
             for key, filename in (
                 ("gentle", "brake_squeal1.wav"),
@@ -258,6 +268,28 @@ class AudioSystem:
             self.door_ring_channel.play(self.door_ring_sound)
         else:
             self.door_ring_channel.stop()
+
+    def _update_overspeed_warning(self, train):
+        """Repeat the overspeed alarm until speed is legal or the trip is reset."""
+        limit = train.als.speed_limit(
+            getattr(train, "_line_for_audio", None), train.position, train.max_speed
+        ) if getattr(train, "_line_for_audio", None) is not None else None
+        overspeed = (
+            limit is not None and abs(train.speed) * 3.6 > limit * 3.6
+        )
+        should_beep = overspeed and (
+            getattr(train, "overspeed_timer", 0.0) > 0.0
+            or getattr(train, "overspeed_emergency_active", False)
+        )
+        if should_beep and not self.overspeed_ring_active:
+            if self.overspeed_ring_sound is not None and self.overspeed_ring_channel is not None:
+                self.overspeed_ring_channel.set_volume(1.0)
+                self.overspeed_ring_channel.play(self.overspeed_ring_sound, loops=-1)
+            self.overspeed_ring_active = True
+        elif not should_beep and self.overspeed_ring_active:
+            if self.overspeed_ring_channel is not None:
+                self.overspeed_ring_channel.stop()
+            self.overspeed_ring_active = False
 
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""
@@ -501,6 +533,7 @@ class AudioSystem:
 
     def update(self, train, dt, camera=None):
         speed = abs(train.speed)
+        self._update_overspeed_warning(train)
         self._update_rolling(speed)
         self._update_engine(train, dt)
         self._update_brakes(train, dt)

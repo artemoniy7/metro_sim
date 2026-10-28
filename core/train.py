@@ -72,10 +72,14 @@ class Train:
         # The train takes one second to react to a brake command.
         brake_commanded = self.emergency_brake_active or self.controller_notch < 0
         if self._was_brake_commanded and not brake_commanded:
-            # Air-release sound (~1.5 s), followed by a 2 s traction delay.
-            self.brake_release_timer = (
-                self.BRAKE_RELEASE_SOUND_S + self.TRACTION_DELAY_AFTER_RELEASE_S
-            )
+            # At a stop, play the 3 s release sound, then wait before allowing traction.
+            # When releasing the brakes while moving, neither sound nor extra delay is needed.
+            if abs(self.speed) < 0.2 / 3.6:
+                self.brake_release_timer = (
+                    self.BRAKE_RELEASE_SOUND_S + self.TRACTION_DELAY_AFTER_RELEASE_S
+                )
+            else:
+                self.brake_release_timer = 0.0
         if brake_commanded:
             self._brake_command_timer += dt
         else:

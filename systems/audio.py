@@ -235,49 +235,67 @@ class AudioSystem:
             self.door_channel.play(self.door_sound)
 
     def configure_station_announcements(self, station_count):
-        """Load the ordered next/current announcements for stations 2 onward."""
+        """Load station-specific next/current announcement clips."""
         self.station_announcements = []
+        self.station_announcement_sounds = {}
         if pygame.mixer.get_init() is None:
             return
 
         station_dir = ASSETS_DIR / "stations" / "line_9"
         for station_number in range(2, int(station_count) + 1):
-            names = []
-            if station_number < int(station_count):
-                names.append(f"st_{station_number:02d}_next.mp3")
-            names.append(f"st_{station_number:02d}_cur.mp3")
-            for filename in names:
-                path = station_dir / filename
+            self.station_announcement_sounds[station_number] = {}
+            for kind, suffix in (("next", "next"), ("current", "cur")):
+                if kind == "next" and station_number >= int(station_count):
+                    continue
+                path = station_dir / f"st_{station_number:02d}_{suffix}.mp3"
                 if not path.is_file():
                     continue
                 try:
-                    self.station_announcements.append(
-                        (pygame.mixer.Sound(str(path)), filename.endswith("_next.mp3"))
-                    )
+                    sound = pygame.mixer.Sound(str(path))
+                    self.station_announcement_sounds[station_number][kind] = sound
+                    self.station_announcements.append((sound, kind == "next"))
                 except (pygame.error, OSError):
                     continue
         self.station_announcement_index = 0
 
-    def toggle_station_announcer(self, train=None, volume=1.0):
-        """Play exactly one next announcement each time I is pressed."""
+    def play_station_announcement(self, station_number, kind="current", volume=1.0):
+        """Play the clip belonging to a specific station and announcement type."""
         channel = self.station_announcement_channel
-        if channel is None or not self.station_announcements:
+        if channel is None:
             return
-
-        # If a clip is already playing, I stops it and advances to the next one.
-        if channel.get_busy():
-            channel.stop()
-
-        if self.station_announcement_index >= len(self.station_announcements):
-            self.station_announcement_index = 0
-
-        sound, is_next_station = self.station_announcements[self.station_announcement_index]
-        self.station_announcement_index += 1
+        sound = self.station_announcement_sounds.get(int(station_number), {}).get(kind)
         volume = max(0.0, min(1.0, volume))
-        if volume <= 0.01:
+        if sound is None or volume <= 0.01:
             return
+        channel.stop()
         channel.set_volume(volume)
         channel.play(sound)
+        if kind == "next":
+            self.start_door_ring(volume=volume)
+
+    def announce_next_station(self, train, line, volume=1.0):
+        """Announce the next station based on this train's actual position."""
+        for index, station in enumerate(line.stations, start=1):
+            if float(station.get("position", 0.0)) > float(train.position) + 12.0:
+                self.play_station_announcement(index, "next", volume)
+                return
+
+    def toggle_station_announcer(self, train=None, line=None, volume=1.0):
+        """The I key announces the next station instead of cycling a global playlist."""
+        if train is not None and line is not None:
+            self.announce_next_station(train, line, volume)
+            return
+        if not self.station_announcements or self.station_announcement_channel is None:
+            return
+        if self.station_announcement_index >= len(self.station_announcements):
+            self.station_announcement_index = 0
+        sound, is_next_station = self.station_announcements[self.station_announcement_index]
+        self.station_announcement_index += 1
+        if volume <= 0.01:
+            return
+        self.station_announcement_channel.stop()
+        self.station_announcement_channel.set_volume(max(0.0, min(1.0, volume)))
+        self.station_announcement_channel.play(sound)
         if is_next_station:
             self.start_door_ring(volume=volume)
 

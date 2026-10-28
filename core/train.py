@@ -35,7 +35,7 @@ class Train:
         self._brake_command_timer = 0.0
         self._was_brake_commanded = False
         self.brake_release_timer = 0.0
-        self.BRAKE_RELEASE_SOUND_S = 1.5
+        self.BRAKE_RELEASE_SOUND_S = 3.0
         self.TRACTION_DELAY_AFTER_RELEASE_S = 2.0
         self.doors_open = False
         self.BRAKE_RESPONSE_DELAY_S = float(data.get("brake_response_delay_s", 0.0))

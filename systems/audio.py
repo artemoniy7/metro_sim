@@ -8,7 +8,8 @@ from settings import ASSETS_DIR
 
 
 class AudioSystem:
-    JOINT_SPACING_M = 50.0
+    MIN_JOINT_SPACING_M = 25.0
+    MAX_JOINT_SPACING_M = 100.0
     REFERENCE_SPEED_MPS = 12.0
     SOUND_FULL_VOLUME_DISTANCE_M = 12.0
     SOUND_CUTOFF_DISTANCE_M = 85.0
@@ -28,6 +29,10 @@ class AudioSystem:
         self.sounds = {}
         self._group_speeds = {}
         self._last_position = None
+        # Joint 0 is at world coordinate 0; other joints are spaced randomly.
+        self._joint_positions = {0: 0.0}
+        self._next_positive_joint = 1
+        self._next_negative_joint = -1
         self._pair_sequences = {}
         self._joint_group_bags = {}
         self._last_joint_group = None
@@ -343,14 +348,35 @@ class AudioSystem:
         sound.set_volume(max(0.0, min(0.65, speed_volume * distance_volume)))
         sound.play()
 
-    @staticmethod
-    def _crossed_joints(previous_world, current_world):
-        """Yield track-joint indices crossed between two updates."""
+    def _ensure_joint_positions(self, low, high):
+        """Generate random track-joint locations covering the requested range."""
+        while max(
+            coordinate for index, coordinate in self._joint_positions.items() if index >= 0
+        ) < high:
+            previous = self._joint_positions[self._next_positive_joint - 1]
+            spacing = random.uniform(self.MIN_JOINT_SPACING_M, self.MAX_JOINT_SPACING_M)
+            self._joint_positions[self._next_positive_joint] = previous + spacing
+            self._next_positive_joint += 1
+
+        while min(
+            coordinate for index, coordinate in self._joint_positions.items() if index <= 0
+        ) > low:
+            previous = self._joint_positions[self._next_negative_joint + 1]
+            spacing = random.uniform(self.MIN_JOINT_SPACING_M, self.MAX_JOINT_SPACING_M)
+            self._joint_positions[self._next_negative_joint] = previous - spacing
+            self._next_negative_joint -= 1
+
+    def _crossed_joints(self, previous_world, current_world):
+        """Yield random-layout joint indices crossed between two updates."""
         if current_world <= previous_world:
             return
-        first = int(previous_world // AudioSystem.JOINT_SPACING_M) + 1
-        last = int(current_world // AudioSystem.JOINT_SPACING_M)
-        for joint_index in range(first, last + 1):
+        self._ensure_joint_positions(previous_world, current_world)
+        crossed = (
+            (joint_index, coordinate)
+            for joint_index, coordinate in self._joint_positions.items()
+            if previous_world < coordinate <= current_world
+        )
+        for joint_index, _ in sorted(crossed, key=lambda item: item[1]):
             yield joint_index
 
     def _process_pair(self, pair_key, offsets, previous_position, position,
@@ -492,8 +518,8 @@ class AudioSystem:
                                    previous_position, position, speed, distance)
 
         if len(self._pair_sequences) > 512:
-            cutoff = int((position - train.consist_length_m) // self.JOINT_SPACING_M) - 4
+            oldest_position = position - train.consist_length_m - self.MAX_JOINT_SPACING_M
             self._pair_sequences = {
                 key: group for key, group in self._pair_sequences.items()
-                if key[1] >= cutoff
+                if self._joint_positions.get(key[1], float("-inf")) >= oldest_position
             }

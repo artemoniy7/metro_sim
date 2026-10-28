@@ -306,8 +306,16 @@ class Renderer:
                 # Their on-screen size does not change with camera zoom.
                 head_width = 18
                 head_height = 40
-                head_y = sy - head_height - 3
-                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), 2)
+                # Mount the signal on the tunnel wall, not beside the rails.
+                # Keep the signal head a fixed pixel size at every zoom level.
+                wall_y = sy - tunnel_height + 8
+                head_y = wall_y + 5
+                bracket_y = head_y + head_height // 2
+                pygame.draw.line(
+                    surface, pole_color,
+                    (x - head_width // 2 - 7, bracket_y),
+                    (x - head_width // 2, bracket_y), 3
+                )
 
                 body = pygame.Rect(
                     x - head_width // 2, head_y, head_width, head_height
@@ -343,7 +351,7 @@ class Renderer:
                         signal.name, True, (205, 210, 218)
                     )
                     surface.blit(
-                        label, (x + head_width // 2 + 4, sy - head_height - 10)
+                        label, (x + head_width // 2 + 4, head_y - 14)
                     )
 
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale

@@ -118,9 +118,15 @@ class BotTrain:
                 planned = float(station.get("dwell_seconds", 20))
                 self.dwell_timer = min(planned, max(1.1, seconds_to_dispatch - 3.0))
                 if audio is not None:
-                    announce = getattr(audio, "toggle_station_announcer", None)
+                    announce = getattr(audio, "play_station_announcement", None)
                     if callable(announce) and sound_volume > 0.01:
-                        announce(train, volume=sound_volume)
+                        station_number = next(
+                            (index for index, item in enumerate(line.stations, start=1)
+                             if item is station),
+                            None,
+                        )
+                        if station_number is not None:
+                            announce(station_number, "current", volume=sound_volume)
                 return
         else:
             # Regulate speed on the open line; braking for stations takes priority.

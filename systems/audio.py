@@ -39,6 +39,11 @@ class AudioSystem:
         self._engine_volumes = [0.0, 0.0, 0.0]
         self.brake_sounds = {}
         self.door_sound = None
+        self.door_ring_sound = None
+        self.door_ring_channel = None
+        self.door_ring_active = False
+        self._door_ring_timer = 0.0
+        self._door_ring_beeping = False
         self.station_announcements = []
         self.station_announcement_index = 0
         self.station_announcer_enabled = False
@@ -63,6 +68,12 @@ class AudioSystem:
                 self.door_sound = pygame.mixer.Sound(str(rolling_dir / "doors" / "door_close.wav"))
             except (pygame.error, OSError):
                 self.door_sound = None
+            try:
+                self.door_ring_sound = pygame.mixer.Sound(
+                    str(rolling_dir / "doors" / "ring_doors_temp.wav")
+                )
+            except (pygame.error, OSError):
+                self.door_ring_sound = None
             for filename in ("rolling_low.wav", "rolling_50.wav", "rolling_70.wav"):
                 try:
                     self.rolling_sounds.append(pygame.mixer.Sound(str(rolling_dir / filename)))
@@ -83,13 +94,14 @@ class AudioSystem:
                     self.engine_sounds.append(None)
 
             pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
-            pygame.mixer.set_reserved(8)
+            pygame.mixer.set_reserved(10)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
             # Keep both brake channels reserved from automatic joint-sound playback.
             self.brake_channel = pygame.mixer.Channel(6)
             self.brake_channel_alt = pygame.mixer.Channel(7)
             self.station_announcement_channel = pygame.mixer.Channel(8)
+            self.door_ring_channel = pygame.mixer.Channel(9)
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -168,7 +180,9 @@ class AudioSystem:
                 if not path.is_file():
                     continue
                 try:
-                    self.station_announcements.append(pygame.mixer.Sound(str(path)))
+                    self.station_announcements.append(
+                        (pygame.mixer.Sound(str(path)), filename.endswith("_next.mp3"))
+                    )
                 except (pygame.error, OSError):
                     continue
         self.station_announcement_index = 0
@@ -186,14 +200,47 @@ class AudioSystem:
         if self.station_announcement_index >= len(self.station_announcements):
             self.station_announcement_index = 0
 
-        sound = self.station_announcements[self.station_announcement_index]
+        sound, is_next_station = self.station_announcements[self.station_announcement_index]
         self.station_announcement_index += 1
         channel.set_volume(1.0)
         channel.play(sound)
+        if is_next_station:
+            self.start_door_ring()
 
-    def update_station_announcer(self, train):
-        """Announcements are triggered manually with I; never autoplay."""
-        return
+    def start_door_ring(self):
+        """Start repeating the door-closing beep: 0.5 s on, 0.5 s off."""
+        if self.door_ring_sound is None or self.door_ring_channel is None:
+            return
+        self.door_ring_active = True
+        self._door_ring_timer = 0.0
+        self._door_ring_beeping = True
+        self.door_ring_channel.stop()
+        self.door_ring_channel.set_volume(1.0)
+        self.door_ring_channel.play(self.door_ring_sound)
+
+    def stop_door_ring(self):
+        self.door_ring_active = False
+        self._door_ring_timer = 0.0
+        self._door_ring_beeping = False
+        if self.door_ring_channel is not None:
+            self.door_ring_channel.stop()
+
+    def update_station_announcer(self, train, dt=0.0):
+        """Keep the warning beep in a half-second-on / half-second-off rhythm."""
+        if not self.door_ring_active:
+            return
+        self._door_ring_timer += max(0.0, dt)
+        if self._door_ring_timer < 0.5:
+            return
+        self._door_ring_timer -= 0.5
+        self._door_ring_beeping = not self._door_ring_beeping
+        if self.door_ring_channel is None:
+            return
+        if self._door_ring_beeping:
+            self.door_ring_channel.set_volume(1.0)
+            self.door_ring_channel.play(self.door_ring_sound)
+        else:
+            self.door_ring_channel.stop()
 
     def _update_brakes(self, train, dt):
         """Play brake sounds only while the train is actually applying the brakes."""

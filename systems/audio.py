@@ -466,7 +466,14 @@ class AudioSystem:
     def _update_engine(self, train, dt):
         speed_kmh = abs(train.speed) * 3.6
         traction = 0.0
-        if train.controller_notch > 0 and not train.emergency_brake_active:
+        traction_allowed = (
+            train.controller_notch > 0
+            and not train.emergency_brake_active
+            and not train.brake_applied
+            and getattr(train, "brake_release_timer", 0.0) <= 0.0
+            and not getattr(train, "doors_open", False)
+        )
+        if traction_allowed:
             traction = min(1.0, 0.70 + (train.controller_notch - 1) * 0.10)
         speed_weights = (
             max(0.0, 1.0 - speed_kmh / 22.0),

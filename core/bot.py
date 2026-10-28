@@ -65,7 +65,13 @@ class BotTrain:
             distance = float(station.get("position", 0)) - train.position
             speed = max(0.0, train.speed)
             stopping_distance = speed * speed / (2.0 * max(0.55, train.brake_notches[-1]))
-            if distance <= stopping_distance + max(35.0, speed * 1.2):
+            if distance <= 3.0 and speed <= 0.8:
+                train.controller_notch = 0
+            elif speed <= 0.8 and distance > 3.0:
+                # Do not hold the brakes forever when the train stopped short
+                # of the platform. Creep forward until the stopping point.
+                train.controller_notch = 1
+            elif distance <= stopping_distance + max(8.0, speed * 1.2):
                 train.controller_notch = -3 if speed > 4.0 else -2
             elif speed > target_speed + (1.0 / 3.6):
                 train.controller_notch = -1

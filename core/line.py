@@ -173,18 +173,13 @@ class Line:
                                  // self.PASSIVE_SIGNAL_SPACING_M))
         block_index = int(max(0.0, train_position) // self.PASSIVE_SIGNAL_SPACING_M)
         blocks_ahead = max(0, block_count - block_index - 1)
+        if ahead_distances:
+            base_limit = 80 if blocks_ahead >= 3 else 70 if blocks_ahead == 2 else 60 if blocks_ahead == 1 else 0
+            return min(base_limit, traffic_limit), traffic_blocks
         if blocks_ahead >= 3:
             return 80, blocks_ahead
         if blocks_ahead == 2:
             return 70, blocks_ahead
         if blocks_ahead == 1:
             return 60, blocks_ahead
-        if ahead_distances:
-            return min(traffic_limit, 80), traffic_blocks
-        if blocks_ahead >= 3:
-            return min(80, traffic_limit), blocks_ahead
-        if blocks_ahead == 2:
-            return min(70, traffic_limit), blocks_ahead
-        if blocks_ahead == 1:
-            return min(60, traffic_limit), blocks_ahead
         return 0, blocks_ahead

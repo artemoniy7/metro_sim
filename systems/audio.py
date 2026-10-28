@@ -271,12 +271,8 @@ class AudioSystem:
 
     def _update_overspeed_warning(self, train):
         """Repeat the overspeed alarm until speed is legal or the trip is reset."""
-        limit = train.als.speed_limit(
-            getattr(train, "_line_for_audio", None), train.position, train.max_speed
-        ) if getattr(train, "_line_for_audio", None) is not None else None
-        overspeed = (
-            limit is not None and abs(train.speed) * 3.6 > limit * 3.6
-        )
+        limit = getattr(train, "current_speed_limit_mps", train.max_speed)
+        overspeed = abs(train.speed) > limit
         should_beep = overspeed and (
             getattr(train, "overspeed_timer", 0.0) > 0.0
             or getattr(train, "overspeed_emergency_active", False)

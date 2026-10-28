@@ -320,7 +320,11 @@ class Renderer:
                     surface.blit(sprite, (sprite_x, sprite_y))
 
                     # Light only the active lamp window, never every lamp on the head.
-                    active_lamp = {"red": 0, "yellow": 1, "green": signal.lamp_count - 1}.get(signal.aspect)
+                    active_lamp = (
+                        {"red": 0, "green": 1}.get(signal.aspect)
+                        if signal.lamp_count == 2
+                        else {"red": 0, "yellow": 1, "green": 2}.get(signal.aspect)
+                    )
                     if signal.operational and active_lamp is not None:
                         cache_key = (signal.lamp_count, active_lamp, target_w, target_h,
                                      signal.ASPECTS[signal.aspect])

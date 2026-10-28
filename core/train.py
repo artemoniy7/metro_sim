@@ -69,6 +69,7 @@ class Train:
             return
         dt = min(dt, 0.1)
         limit = self.als.speed_limit(line, self.position, self.max_speed)
+        self.current_speed_limit_mps = limit
         limit_kmh = limit * 3.6
         speed_kmh = abs(self.speed) * 3.6
 
@@ -133,8 +134,9 @@ class Train:
                 self.acceleration_state = 0.0
         else:
             # Supervision brakes automatically if the train exceeds its permitted speed.
-            if self.speed > limit:
-                self.speed = max(limit, self.speed - self.service_brake * dt)
+            permitted_speed = limit + self.SPEED_MARGIN_KMH / 3.6
+            if self.speed > permitted_speed:
+                self.speed = max(permitted_speed, self.speed - self.service_brake * dt)
                 self.acceleration_state = min(0.0, self.acceleration_state)
             else:
                 target_acceleration = natural_acceleration

@@ -77,7 +77,14 @@ class Train:
         # stronger service braking). Selecting T2/T3 suppresses the emergency
         # trip because the driver is already applying stronger service braking.
         stronger_service_braking = self.controller_notch <= -2
-        if stronger_service_braking:
+        is_bot = bool(getattr(self, "is_bot", False))
+        if is_bot:
+            # AI drivers regulate speed themselves; don't latch the emergency
+            # brake for them. The normal permitted-speed supervision below still
+            # limits speed, and manual emergency braking remains available.
+            self.overspeed_timer = 0.0
+            self.overspeed_emergency_active = False
+        elif stronger_service_braking:
             self.overspeed_timer = 0.0
         elif not self.overspeed_emergency_active:
             if speed_kmh > limit_kmh:
@@ -87,9 +94,11 @@ class Train:
             else:
                 self.overspeed_timer = 0.0
 
-        # A speed-enforcement emergency brake overrides every controller position.
+        # Player trains retain emergency protection; AI trains use regular
+        # speed supervision so a brief overspeed cannot permanently immobilize them.
         self.emergency_brake_active = bool(
-            self.manual_emergency_brake_active or self.overspeed_emergency_active
+            self.manual_emergency_brake_active
+            or (self.overspeed_emergency_active and not is_bot)
         )
         grade_acceleration = line.path.grade_acceleration(self.position)
         resistance = self.rolling_resistance + self.speed_resistance * self.speed

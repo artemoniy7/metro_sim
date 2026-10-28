@@ -41,6 +41,8 @@ class AudioSystem:
         self._car_image_width = 2048
         self.rolling_sounds = []
         self.rolling_channels = []
+        self.door_channel = None
+        self.joint_channels = []
         self.engine_sounds = []
         self.engine_channels = []
         self._engine_volumes = [0.0, 0.0, 0.0]
@@ -105,8 +107,10 @@ class AudioSystem:
                 except (pygame.error, OSError):
                     self.engine_sounds.append(None)
 
-            pygame.mixer.set_num_channels(max(16, pygame.mixer.get_num_channels()))
-            pygame.mixer.set_reserved(10)
+            # Give each sound category its own channels. Track-joint sounds
+            # must never steal a channel from the motor, brakes, or announcements.
+            pygame.mixer.set_num_channels(max(32, pygame.mixer.get_num_channels()))
+            pygame.mixer.set_reserved(13)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
             # Keep both brake channels reserved from automatic joint-sound playback.
@@ -116,6 +120,8 @@ class AudioSystem:
             self.door_ring_channel = pygame.mixer.Channel(9)
             self.brake_release_channel = pygame.mixer.Channel(10)
             self.overspeed_ring_channel = pygame.mixer.Channel(11)
+            self.door_channel = pygame.mixer.Channel(12)
+            self.joint_channels = [pygame.mixer.Channel(i) for i in range(13, 32)]
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -186,9 +192,10 @@ class AudioSystem:
 
     def play_door_sound(self):
         """Play the door sound at full volume for opening or closing."""
-        if self.door_sound is not None:
-            self.door_sound.set_volume(1.0)
-            self.door_sound.play()
+        if self.door_sound is not None and self.door_channel is not None:
+            self.door_channel.stop()
+            self.door_channel.set_volume(1.0)
+            self.door_channel.play(self.door_sound)
 
     def configure_station_announcements(self, station_count):
         """Load the ordered next/current announcements for stations 2 onward."""
@@ -394,8 +401,18 @@ class AudioSystem:
         distance_volume = 1.0 - max(0.0, distance_m - self.SOUND_FULL_VOLUME_DISTANCE_M) / (
             self.SOUND_CUTOFF_DISTANCE_M - self.SOUND_FULL_VOLUME_DISTANCE_M
         )
-        sound.set_volume(max(0.0, min(0.65, speed_volume * distance_volume)))
-        sound.play()
+        volume = max(0.0, min(0.65, speed_volume * distance_volume))
+        # Use a dedicated pool instead of Sound.play(), which can interrupt
+        # unrelated sounds when pygame runs out of automatic mixer channels.
+        channel = next(
+            (candidate for candidate in self.joint_channels if not candidate.get_busy()),
+            None,
+        )
+        if channel is None:
+            # Preserve sounds already playing rather than cutting one off.
+            return
+        channel.set_volume(volume)
+        channel.play(sound)
 
     def _ensure_joint_positions(self, low, high):
         """Generate random track-joint locations covering the requested range."""

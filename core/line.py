@@ -131,6 +131,11 @@ class Line:
         following train gets a zero code while it is within one full block
         (275 m) of the preceding train's rear, not just its front reference.
         """
+        # Treat the beginning of the line as the rear of a virtual queue:
+        # all trains (including the player) are compared with trains ahead,
+        # but the player can enter the line without being blocked by a bot
+        # behind them. Position is the front reference; subtract the full
+        # consist length to get the leading train's rear.
         clear_distances = []
         for other in self.traffic_trains:
             if not hasattr(other, "position"):
@@ -147,15 +152,15 @@ class Line:
         if clear_distances:
             clear_gap = min(clear_distances)
             traffic_blocks = max(0, int(clear_gap // self.PASSIVE_SIGNAL_SPACING_M))
-            # Keep at least one complete block between the following train and
-            # the rear of the occupied train. The code steps down by block.
-            if clear_gap <= self.PASSIVE_SIGNAL_SPACING_M:
+            # Delay each restriction by one block compared with the previous
+            # profile, so braking does not start quite as early.
+            if clear_gap <= 0:
                 traffic_limit = 0
-            elif clear_gap <= 2 * self.PASSIVE_SIGNAL_SPACING_M:
+            elif clear_gap <= self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 40
-            elif clear_gap <= 3 * self.PASSIVE_SIGNAL_SPACING_M:
+            elif clear_gap <= 2 * self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 60
-            elif clear_gap <= 4 * self.PASSIVE_SIGNAL_SPACING_M:
+            elif clear_gap <= 3 * self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 70
 
         next_station = next((
@@ -185,10 +190,7 @@ class Line:
         block_index = int(max(0.0, train_position) // self.PASSIVE_SIGNAL_SPACING_M)
         blocks_to_end = max(0, block_count - block_index - 1)
         if clear_distances:
-            return min(traffic_limit, 80 if traffic_blocks >= 4 else
-                       70 if traffic_blocks >= 3 else
-                       60 if traffic_blocks >= 2 else
-                       40 if traffic_blocks >= 1 else 0), traffic_blocks
+            return traffic_limit, traffic_blocks
         if blocks_to_end >= 4:
             return 80, blocks_to_end
         if blocks_to_end == 3:

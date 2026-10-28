@@ -66,6 +66,7 @@ class AudioSystem:
         self.station_announcer_enabled = False
         self.station_announcer_pending_start = False
         self.station_announcement_channel = None
+        self._last_manual_current_station = None
         self.brake_channel = None
         self.brake_channel_alt = None
         self._active_brake_channel = 0
@@ -274,25 +275,31 @@ class AudioSystem:
             self.start_door_ring(volume=volume)
 
     def announce_next_station(self, train, line, volume=1.0):
-        """Announce the current station when available, otherwise the next one."""
+        """Announce a station once on arrival; repeated presses announce the next one."""
         train_position = float(train.position)
         sounds = getattr(self, "station_announcement_sounds", {})
+        current_station_index = None
 
-        # On a platform, prefer that station's current-arrival recording.
-        # Some stations may not have a current clip installed, so don't return
-        # silently: fall back to the next available station announcement.
+        # First press while at a platform announces that station. If it was
+        # already announced manually, don't replay it just because the player
+        # pressed I again to continue the departure sequence.
         for index, station in enumerate(line.stations, start=1):
             station_position = float(station.get("position", 0.0))
             platform_half_length = float(station.get("length_m", 162.0)) / 2.0
             if abs(train_position - station_position) <= platform_half_length + 40.0:
-                if sounds.get(index, {}).get("current") is not None:
+                current_station_index = index
+                if (index != self._last_manual_current_station
+                        and sounds.get(index, {}).get("current") is not None):
                     self.play_station_announcement(index, "current", volume)
+                    self._last_manual_current_station = index
                     return
                 break
 
-        # Between stations, or when the current clip is missing, announce the
-        # next station for which a recording actually exists.
+        # If the current station has already been announced (or its clip is
+        # missing), pressing I again plays the next station's "next" recording.
         for index, station in enumerate(line.stations, start=1):
+            if current_station_index is not None and index <= current_station_index:
+                continue
             if float(station.get("position", 0.0)) > train_position + 12.0:
                 if sounds.get(index, {}).get("next") is not None:
                     self.play_station_announcement(index, "next", volume)

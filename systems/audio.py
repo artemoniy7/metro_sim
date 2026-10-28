@@ -274,24 +274,41 @@ class AudioSystem:
             self.start_door_ring(volume=volume)
 
     def announce_next_station(self, train, line, volume=1.0):
-        """Announce the station the train is entering, or the next one en route."""
+        """Announce the current station when available, otherwise the next one."""
         train_position = float(train.position)
+        sounds = getattr(self, "station_announcement_sounds", {})
 
-        # While the train is on a station platform, announce that station as
-        # the current one. Without this check, the old logic immediately picked
-        # the following station as soon as the train reached the platform.
+        # On a platform, prefer that station's current-arrival recording.
+        # Some stations may not have a current clip installed, so don't return
+        # silently: fall back to the next available station announcement.
         for index, station in enumerate(line.stations, start=1):
             station_position = float(station.get("position", 0.0))
             platform_half_length = float(station.get("length_m", 162.0)) / 2.0
             if abs(train_position - station_position) <= platform_half_length + 40.0:
-                self.play_station_announcement(index, "current", volume)
-                return
+                if sounds.get(index, {}).get("current") is not None:
+                    self.play_station_announcement(index, "current", volume)
+                    return
+                break
 
-        # Between stations, announce the next station ahead.
+        # Between stations, or when the current clip is missing, announce the
+        # next station for which a recording actually exists.
         for index, station in enumerate(line.stations, start=1):
             if float(station.get("position", 0.0)) > train_position + 12.0:
-                self.play_station_announcement(index, "next", volume)
-                return
+                if sounds.get(index, {}).get("next") is not None:
+                    self.play_station_announcement(index, "next", volume)
+                    return
+
+        # Last-resort compatibility path for older/global announcement assets.
+        if self.station_announcements and self.station_announcement_channel is not None:
+            if self.station_announcement_index >= len(self.station_announcements):
+                self.station_announcement_index = 0
+            sound, is_next_station = self.station_announcements[self.station_announcement_index]
+            self.station_announcement_index += 1
+            self.station_announcement_channel.stop()
+            self.station_announcement_channel.set_volume(max(0.0, min(1.0, volume)))
+            self.station_announcement_channel.play(sound)
+            if is_next_station:
+                self.start_door_ring(volume=volume)
 
     def toggle_station_announcer(self, train=None, line=None, volume=1.0):
         """The I key announces the next station instead of cycling a global playlist."""

@@ -406,6 +406,15 @@ class Renderer:
                         sprite = pygame.transform.smoothscale(
                             vehicle_image, (max(1, vehicle_width), max(1, loco_height))
                         )
+                        # AI doors are rendered independently of the player's door animation.
+                        if getattr(bot_train, "doors_open", False):
+                            saved_door_amount = self.door_open_amount
+                            self.door_open_amount = 1.0
+                            self._draw_doors(
+                                sprite, vehicle_image, vehicle_width, loco_height,
+                                is_loco=wagon.is_loco, is_rear_cab=is_rear_cab
+                            )
+                            self.door_open_amount = saved_door_amount
                         surface.blit(sprite, (round(bot_vehicle_x), round(center_y - loco_height + 4)))
                     else:
                         pygame.draw.rect(
@@ -426,6 +435,11 @@ class Renderer:
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
         surface.blit(self.small_font.render(f"АЛС-АРС: {train.als.indication_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
         surface.blit(self.small_font.render(f"Свободно блоков: {train.als.free_blocks_ahead}", True, (170, 195, 215)), (30, 108))
+        bot_status = " | ".join(
+            f"{getattr(bot, 'display_name', 'Бот')}: {bot.speed * 3.6:.0f} км/ч, {bot.position:.0f} м"
+            for bot in (other_trains or [])
+        ) or "нет"
+        surface.blit(self.small_font.render(f"ИИ-составов: {len(other_trains or [])} ({bot_status})", True, (175, 205, 235)), (30, 130))
         lever_color = (255, 180, 95) if train.controller_notch < 0 else (110, 220, 160)
         surface.blit(self.font.render(f"Ручка: {train.controller_label}", True, lever_color), (30, 115))
         surface.blit(self.small_font.render(f"Путь: {train.position:.0f} м / {line.path.total_length:.0f} м", True, (210, 215, 222)), (30, 147))

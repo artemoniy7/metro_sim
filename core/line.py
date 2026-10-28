@@ -21,10 +21,18 @@ class Line:
         position = self.PASSIVE_SIGNAL_SPACING_M
         index = 1
         while position < total:
-            self.signals.append(Signal(
-                position=position, aspect="dark", name=f"П{index}",
-                operational=False, kind="passive", lamp_count=2,
-            ))
+            # Do not place conventional signals within a station platform.
+            on_platform = any(
+                float(station.get("position", 0)) - float(station.get("length_m", 162)) / 2.0
+                <= position <=
+                float(station.get("position", 0)) + float(station.get("length_m", 162)) / 2.0
+                for station in self.stations
+            )
+            if not on_platform:
+                self.signals.append(Signal(
+                    position=position, aspect="dark", name=f"П{index}",
+                    operational=False, kind="passive", lamp_count=2,
+                ))
             position += self.PASSIVE_SIGNAL_SPACING_M
             index += 1
 
@@ -42,6 +50,16 @@ class Line:
                 operational=True, kind="station_exit", lamp_count=3,
             ))
 
+        # Safety cleanup: no signal head should stand within platform limits.
+        self.signals = [
+            signal for signal in self.signals
+            if not any(
+                float(station.get("position", 0)) - float(station.get("length_m", 162)) / 2.0
+                <= signal.position <=
+                float(station.get("position", 0)) + float(station.get("length_m", 162)) / 2.0
+                for station in self.stations
+            )
+        ]
         self.signals.sort(key=lambda signal: signal.position)
 
     def update_signals(self, train, train_speed=None):
@@ -109,16 +127,16 @@ class Line:
             station_end = center + half_length
             distance_to_platform = station_start - train_position
 
-            # Station speed profile:
-            # 70 km/h farther out, 60 km/h on approach and through the
-            # first half, then 40 km/h from the station midpoint to its end.
+            # Station speed profile: 70 km/h from 100 m before the
+            # platform, 60 km/h from 50 m before it and through its first
+            # half, then 40 km/h from the midpoint to the platform end.
             if station_start <= train_position <= station_end:
                 if train_position >= center:
                     return 40, 1
                 return 60, 1
-            if 0.0 <= distance_to_platform <= 300.0:
+            if 0.0 <= distance_to_platform <= 50.0:
                 return 60, 1
-            if 300.0 < distance_to_platform <= 600.0:
+            if 50.0 < distance_to_platform <= 100.0:
                 return 70, 2
 
         block_count = max(1, int((self.path.total_length + self.PASSIVE_SIGNAL_SPACING_M - 1)

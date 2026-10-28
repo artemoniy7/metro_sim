@@ -40,7 +40,11 @@ class Game:
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
         self.bot_number += 1
-        bot = BotTrain(train_data, start_position=max(300.0, self.train.position + 1200.0))
+        # Give every dispatched train its own initial slot. Previously each
+        # dispatch used player_position + 1200 m, so all bots spawned together.
+        start_position = 300.0 + (self.bot_number - 1) * 1400.0
+        start_position = min(start_position, max(300.0, self.line.path.total_length - 2500.0))
+        bot = BotTrain(train_data, start_position=start_position)
         bot.train.display_name = f"Состав {self.bot_number}"
         self.bot_trains.append(bot)
 
@@ -98,7 +102,13 @@ class Game:
                 # Remove the train from the terminus and put it at the back of
                 # the service queue. The player's own train is never recycled.
                 self.bot_trains.remove(bot)
-                bot.train.position = max(300.0, self.train.position + 1200.0)
+                # Recycle this train to its own slot, rather than placing
+                # every returning train at the player's current position.
+                slot_index = self.bot_trains.index(bot)
+                bot.train.position = min(
+                    300.0 + slot_index * 1400.0,
+                    max(300.0, self.line.path.total_length - 2500.0),
+                )
                 bot.train.speed = 0.0
                 bot.train.acceleration_state = 0.0
                 bot.train.controller_notch = 0

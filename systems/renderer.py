@@ -301,16 +301,17 @@ class Renderer:
             if -40 < x < width + 40:
                 sy = rail_y_at(max(0, min(width - 1, x)))
                 pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
-                # A real signal head is only a small part of the 1024x1536 atlas.
-                # Keep its world size modest and scale the complete crop uniformly.
-                head_height = max(6, min(16, round(0.85 * scale)))
-                head_y = sy - head_height - max(2, round(0.25 * scale))
-                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), max(1, round(0.12 * scale)))
+                # Signal heads are UI-like trackside objects: keep their pixel
+                # size constant regardless of camera zoom. 40 px is 2.5x the
+                # previous 16 px maximum, so they remain readable at full zoom.
+                head_height = 40
+                head_y = sy - head_height - 3
+                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), 2)
 
                 head_sprite = self.signal_heads.get(signal.lamp_count)
                 if head_sprite is not None:
                     source_w, source_h = head_sprite.get_size()
-                    target_h = max(7, min(16, head_height))
+                    target_h = head_height
                     target_w = max(1, round(source_w * target_h / source_h))
                     sprite = pygame.transform.smoothscale(head_sprite, (target_w, target_h))
                     # The atlas points to the LEFT; flip it so lamps face the approaching train on the RIGHT.
@@ -342,18 +343,25 @@ class Renderer:
                             px = target_w - round(local_x * target_w / crop_w)
                             py = round(local_y * target_h / crop_h)
                             color = signal.ASPECTS[signal.aspect]
-                            radius = max(2, round(target_h * 0.11))
-                            pygame.draw.circle(glow, (*color, 105), (px, py), radius)
-                            beam_len = max(5, round(target_h * 0.65))
-                            beam_half = max(2, round(target_h * 0.13))
-                            pygame.draw.polygon(glow, (*color, 65), [
-                                (px, py), (px + beam_len, py - beam_half),
+                            # The beam is intentionally much larger than the
+                            # lamp core and extends toward the approaching train.
+                            # Draw it in a separate overlay so it remains visible
+                            # over the dark signal housing.
+                            radius = 5
+                            beam_len = 34
+                            beam_half = 13
+                            pygame.draw.polygon(glow, (*color, 150), [
+                                (px, py),
+                                (px + beam_len, py - beam_half),
                                 (px + beam_len, py + beam_half),
                             ])
+                            pygame.draw.circle(glow, (*color, 220), (px, py), radius)
+                            pygame.draw.circle(glow, (255, 245, 225, 230),
+                                               (px, py), 2)
                             self.signal_glow_cache[cache_key] = glow
                         surface.blit(glow, (sprite_x, sprite_y))
                 else:
-                    head_width = max(6, min(16, round(0.65 * scale)))
+                    head_width = 18
                     body = pygame.Rect(x - head_width // 2, head_y, head_width, head_height)
                     pygame.draw.rect(surface, (20, 22, 26), body, border_radius=2)
                     pygame.draw.rect(surface, pole_color, body, 1, border_radius=2)
@@ -361,7 +369,7 @@ class Renderer:
                     for lamp_index in range(signal.lamp_count):
                         lamp_y = head_y + round((lamp_index + 0.5) * head_height / signal.lamp_count)
                         color = signal.ASPECTS[signal.aspect] if signal.operational and lamp_index == active_lamp else (45, 47, 51)
-                        pygame.draw.circle(surface, color, (x, lamp_y), max(1, round(0.09 * scale)))
+                        pygame.draw.circle(surface, color, (x, lamp_y), 4)
 
                 if signal.operational:
                     surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 5, sy - head_height - 10))

@@ -274,9 +274,22 @@ class AudioSystem:
             self.start_door_ring(volume=volume)
 
     def announce_next_station(self, train, line, volume=1.0):
-        """Announce the next station based on this train's actual position."""
+        """Announce the station the train is entering, or the next one en route."""
+        train_position = float(train.position)
+
+        # While the train is on a station platform, announce that station as
+        # the current one. Without this check, the old logic immediately picked
+        # the following station as soon as the train reached the platform.
         for index, station in enumerate(line.stations, start=1):
-            if float(station.get("position", 0.0)) > float(train.position) + 12.0:
+            station_position = float(station.get("position", 0.0))
+            platform_half_length = float(station.get("length_m", 162.0)) / 2.0
+            if abs(train_position - station_position) <= platform_half_length + 40.0:
+                self.play_station_announcement(index, "current", volume)
+                return
+
+        # Between stations, announce the next station ahead.
+        for index, station in enumerate(line.stations, start=1):
+            if float(station.get("position", 0.0)) > train_position + 12.0:
                 self.play_station_announcement(index, "next", volume)
                 return
 

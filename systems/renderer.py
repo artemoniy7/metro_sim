@@ -165,7 +165,7 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False):
+    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False, other_trains=None):
         width, height = surface.get_size()
         if self.last_render_time is None:
             frame_dt = 1.0 / 60.0
@@ -386,6 +386,39 @@ class Renderer:
                     center_y = rail_y_at(center_x)
                     pygame.draw.rect(surface, (205, 210, 215) if wagon.is_loco else (185, 190, 196), (round(vehicle_x), round(center_y - 48 + 4), vehicle_width, 48))
             vehicle_x += vehicle_width
+
+        # Draw AI trains using the same vehicle sprites and shared world camera.
+        for bot_train in (other_trains or []):
+            bot_x = (line.path.total_length - bot_train.position
+                     - bot_train.loco_length_m - camera_x) * scale
+            bot_loco_width = max(1, round(bot_train.loco_length_m * scale))
+            bot_car_width = max(1, round(bot_train.car_length_m * scale))
+            bot_vehicle_x = bot_x
+            for wagon in bot_train.wagons:
+                vehicle_width = bot_loco_width if wagon.is_loco else bot_car_width
+                vehicle_image = self.loco_image if wagon.is_loco else self.car_image
+                is_rear_cab = wagon.is_loco and wagon.index == len(bot_train.wagons) - 1
+                if is_rear_cab and vehicle_image is not None:
+                    vehicle_image = pygame.transform.flip(vehicle_image, True, False)
+                if bot_vehicle_x + vehicle_width >= -bot_loco_width and bot_vehicle_x <= width + bot_loco_width:
+                    center_y = rail_y_at(bot_vehicle_x + vehicle_width / 2)
+                    if vehicle_image is not None:
+                        sprite = pygame.transform.smoothscale(
+                            vehicle_image, (max(1, vehicle_width), max(1, loco_height))
+                        )
+                        surface.blit(sprite, (round(bot_vehicle_x), round(center_y - loco_height + 4)))
+                    else:
+                        pygame.draw.rect(
+                            surface, (130, 150, 170),
+                            (round(bot_vehicle_x), round(center_y - 44), vehicle_width, 44)
+                        )
+                bot_vehicle_x += vehicle_width
+            if -80 < bot_x < width + 80:
+                bot_label = self.small_font.render(
+                    getattr(bot_train, "display_name", "Бот"),
+                    True, (175, 205, 235)
+                )
+                surface.blit(bot_label, (round(bot_x), max(220, round(rail_y_at(bot_x) - 68))))
 
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
         pygame.draw.rect(surface, (12, 15, 20), (16, 16, 430, 190), border_radius=8)

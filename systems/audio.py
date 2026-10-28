@@ -29,6 +29,8 @@ class AudioSystem:
         self._group_speeds = {}
         self._last_position = None
         self._pair_sequences = {}
+        self._joint_group_bags = {}
+        self._last_joint_group = None
         self._groups = []
         self._loco_image_width = 2048
         self._car_image_width = 2048
@@ -372,7 +374,21 @@ class AudioSystem:
                 group for group in self._groups
                 if abs(self._group_speeds[group] - speed_kmh) <= closest_difference + 5.0
             ]
-            group = random.choice(candidates)
+
+            # Draw from a shuffled bag instead of choosing freely on every hit.
+            # This prevents the same few recordings from repeating in a pattern
+            # while still keeping recordings close to the train's current speed.
+            bag_key = tuple(candidates)
+            bag = self._joint_group_bags.get(bag_key)
+            if not bag:
+                bag = list(candidates)
+                random.shuffle(bag)
+                # Avoid an identical recording at the boundary between bags.
+                if len(bag) > 1 and bag[-1] == self._last_joint_group:
+                    bag[0], bag[-1] = bag[-1], bag[0]
+                self._joint_group_bags[bag_key] = bag
+            group = bag.pop()
+            self._last_joint_group = group
             self._pair_sequences[(pair_key, joint_index)] = group
             self._play(group, 1, speed, distance_m)
 

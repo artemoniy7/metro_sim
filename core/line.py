@@ -45,52 +45,56 @@ class Line:
         self.signals.sort(key=lambda signal: signal.position)
 
     def update_signals(self, train, train_speed=None):
-        """Set aspects from occupancy of the block protected by each signal."""
+        """Keep each signal red while its protected block is occupied.
+
+        Blocks are the intervals between consecutive working signals (with the
+        next physical signal acting as the far boundary). A block is released
+        only when the train's rear-most wheel point passes its far boundary.
+        """
         if hasattr(train, "position"):
             front_point = float(train.position) + float(train.loco_length_m)
             rear_point = front_point - float(train.consist_length_m)
         else:
-            front_point = float(train)
-            rear_point = front_point
+            front_point = rear_point = float(train)
 
+        operational = sorted(
+            (signal for signal in self.signals if signal.operational),
+            key=lambda signal: signal.position,
+        )
+        for signal in self.signals:
+            if not signal.operational:
+                signal.set_aspect("dark")
+
+        for index, signal in enumerate(operational):
+            # The next operational signal bounds this signal's protected block.
+            block_start = signal.position
+            block_end = (
+                operational[index + 1].position
+                if index + 1 < len(operational)
+                else self.path.total_length
+            )
+
+            # Red while any part of the train occupies the block. Never turn
+            # a signal green merely because the train passed its own pole.
+            occupied = front_point >= block_start and rear_point < block_end
+            if occupied:
+                signal.set_aspect("red")
+            else:
+                signal.set_aspect("green")
+
+        # Entry signals show a restrictive approach aspect before the platform.
         next_station = next((
             station for station in self.stations
             if float(station.get("position", 0)) >= front_point
         ), None)
-
-        for signal in self.signals:
-            if not signal.operational:
-                signal.set_aspect("dark")
-                continue
-
-            # The signal protects the following block, not just its own pole.
-            # It stays red while any part of the train occupies that block.
-            block_start = signal.position
-            block_end = min(self.path.total_length, block_start + self.PASSIVE_SIGNAL_SPACING_M)
-            occupies_protected_block = (
-                front_point >= block_start and rear_point <= block_end
-            )
-            if occupies_protected_block:
-                signal.set_aspect("red")
-                continue
-
-            # If the train has not reached this signal yet, show the station
-            # approach warning only inside the final 50 m to the platform.
-            if signal.position > front_point and next_station is not None:
-                center = float(next_station.get("position", 0))
-                half_length = float(next_station.get("length_m", 162)) / 2.0
-                platform_start = center - half_length
-                distance_to_platform = platform_start - front_point
-                if signal.kind == "station_entry" and 0.0 <= distance_to_platform <= 50.0:
-                    signal.set_aspect("yellow")
-                    continue
-
-            # Do not show green if the next protected block is occupied by
-            # any part of this train. Once its tail clears the block, it may clear.
-            if rear_point > block_end:
-                signal.set_aspect("green")
-            else:
-                signal.set_aspect("red")
+        if next_station is not None:
+            center = float(next_station.get("position", 0))
+            half_length = float(next_station.get("length_m", 162)) / 2.0
+            distance_to_platform = center - half_length - front_point
+            if 0.0 <= distance_to_platform <= 50.0:
+                for signal in operational:
+                    if signal.kind == "station_entry" and signal.position >= front_point:
+                        signal.set_aspect("yellow")
 
     def block_indication(self, train_position):
         """Return the simplified ALS-ARS indication in km/h and free block count."""

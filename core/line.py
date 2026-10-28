@@ -125,25 +125,37 @@ class Line:
                             signal.set_aspect("yellow")
 
     def block_indication(self, train_position):
-        """Return a speed code limited by stations and trains ahead."""
-        ahead_distances = [
-            float(other.position) - float(train_position)
-            for other in self.traffic_trains
-            if hasattr(other, "position")
-            and float(other.position) > float(train_position) + 1.0
-        ]
+        """Return an ALS-ARS code using the clear distance to the rear of trains ahead.
+
+        A train occupies the block until its rear clears it. Therefore the
+        following train gets a zero code while it is within one full block
+        (275 m) of the preceding train's rear, not just its front reference.
+        """
+        clear_distances = []
+        for other in self.traffic_trains:
+            if not hasattr(other, "position"):
+                continue
+            other_position = float(other.position)
+            if other_position <= float(train_position) + 1.0:
+                continue
+            other_length = float(getattr(other, "consist_length_m", 0.0))
+            clear_distance = other_position - other_length - float(train_position)
+            clear_distances.append(max(0.0, clear_distance))
+
         traffic_limit = 80
         traffic_blocks = 99
-        if ahead_distances:
-            gap = min(ahead_distances)
-            traffic_blocks = max(0, int(gap // self.PASSIVE_SIGNAL_SPACING_M))
-            if gap < 120.0:
+        if clear_distances:
+            clear_gap = min(clear_distances)
+            traffic_blocks = max(0, int(clear_gap // self.PASSIVE_SIGNAL_SPACING_M))
+            # Keep at least one complete block between the following train and
+            # the rear of the occupied train. The code steps down by block.
+            if clear_gap <= self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 0
-            elif gap < 275.0:
+            elif clear_gap <= 2 * self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 40
-            elif gap < 550.0:
+            elif clear_gap <= 3 * self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 60
-            elif gap < 825.0:
+            elif clear_gap <= 4 * self.PASSIVE_SIGNAL_SPACING_M:
                 traffic_limit = 70
 
         next_station = next((
@@ -157,9 +169,6 @@ class Line:
             station_end = center + half_length
             distance_to_platform = station_start - train_position
 
-            # Station speed profile: 70 km/h from 100 m before the
-            # platform, 60 km/h from 50 m before it and through its first
-            # half, then 40 km/h from the midpoint to the platform end.
             if station_start <= train_position <= station_end:
                 if train_position >= center:
                     return min(40, traffic_limit), min(1, traffic_blocks)
@@ -169,20 +178,23 @@ class Line:
             if 50.0 < distance_to_platform <= 100.0:
                 return min(70, traffic_limit), min(2, traffic_blocks)
 
-        block_count = max(1, int((self.path.total_length + self.PASSIVE_SIGNAL_SPACING_M - 1)
-                                 // self.PASSIVE_SIGNAL_SPACING_M))
+        block_count = max(1, int(
+            (self.path.total_length + self.PASSIVE_SIGNAL_SPACING_M - 1)
+            // self.PASSIVE_SIGNAL_SPACING_M
+        ))
         block_index = int(max(0.0, train_position) // self.PASSIVE_SIGNAL_SPACING_M)
-        blocks_ahead = max(0, block_count - block_index - 1)
-        if ahead_distances:
-            # Count complete clear blocks between this train and the next
-            # train, rather than reporting the number of blocks to the end
-            # of the entire line.
-            base_limit = 80 if blocks_ahead >= 3 else 70 if blocks_ahead == 2 else 60 if blocks_ahead == 1 else 0
-            return min(base_limit, traffic_limit), traffic_blocks
-        if blocks_ahead >= 3:
-            return 80, blocks_ahead
-        if blocks_ahead == 2:
-            return 70, blocks_ahead
-        if blocks_ahead == 1:
-            return 60, blocks_ahead
-        return 0, blocks_ahead
+        blocks_to_end = max(0, block_count - block_index - 1)
+        if clear_distances:
+            return min(traffic_limit, 80 if traffic_blocks >= 4 else
+                       70 if traffic_blocks >= 3 else
+                       60 if traffic_blocks >= 2 else
+                       40 if traffic_blocks >= 1 else 0), traffic_blocks
+        if blocks_to_end >= 4:
+            return 80, blocks_to_end
+        if blocks_to_end == 3:
+            return 70, blocks_to_end
+        if blocks_to_end == 2:
+            return 60, blocks_to_end
+        if blocks_to_end == 1:
+            return 40, blocks_to_end
+        return 0, blocks_to_end

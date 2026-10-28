@@ -217,9 +217,13 @@ class AudioSystem:
         try:
             return pygame.mixer.Sound(str(engine_dir / filename))
         except (pygame.error, OSError):
-            # Missing/empty motor files no longer leave the train silent.
+            # A missing/empty motor file should not prevent joint sounds loading.
             # Keep async.wav as the real middle-speed layer when it exists.
-            return self._make_motor_fallback(*fallback)
+            try:
+                return self._make_motor_fallback(*fallback)
+            except (pygame.error, OSError, ValueError, struct.error):
+                # Audio fallback is optional; rail-joint audio must still initialize.
+                return None
 
     def play_door_sound(self):
         """Play the door sound at full volume for opening or closing."""

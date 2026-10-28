@@ -18,9 +18,16 @@ class BotTrain:
         self.closed_for_departure = False
 
     def _next_station(self, line):
+        # Keep the target until the train has actually stopped at it. A small
+        # overshoot must not make the bot silently skip the station.
+        if self.target_station is not None:
+            target_position = float(self.target_station.get("position", 0))
+            if target_position >= self.train.position - 15.0:
+                return self.target_station
+
         for station in line.stations:
             position = float(station.get("position", 0))
-            if position > self.train.position + 12.0:
+            if position > self.train.position + 3.0:
                 return station
         return None
 
@@ -64,14 +71,19 @@ class BotTrain:
         if station is not None:
             distance = float(station.get("position", 0)) - train.position
             speed = max(0.0, train.speed)
-            stopping_distance = speed * speed / (2.0 * max(0.55, train.brake_notches[-1]))
-            if distance <= 3.0 and speed <= 0.8:
+            # Be conservative: include reaction time and brake build-up, not
+            # only the ideal physical stopping distance.
+            effective_brake = max(0.55, train.brake_notches[-1] * 0.75)
+            stopping_distance = speed * speed / (2.0 * effective_brake)
+            braking_threshold = stopping_distance + speed * 1.8 + 18.0
+            if abs(distance) <= 3.0 and speed <= 0.8:
                 train.controller_notch = 0
+            elif distance <= 3.0:
+                train.controller_notch = -3 if speed > 1.0 else -2
             elif speed <= 0.8 and distance > 3.0:
-                # Do not hold the brakes forever when the train stopped short
-                # of the platform. Creep forward until the stopping point.
+                # If stopped short, creep forward to the platform.
                 train.controller_notch = 1
-            elif distance <= stopping_distance + max(8.0, speed * 1.2):
+            elif distance <= braking_threshold:
                 train.controller_notch = -3 if speed > 4.0 else -2
             elif speed > target_speed + (1.0 / 3.6):
                 train.controller_notch = -1
@@ -80,7 +92,7 @@ class BotTrain:
             else:
                 train.controller_notch = 0
 
-            if distance <= 3.0 and train.speed <= 0.8:
+            if abs(distance) <= 3.0 and train.speed <= 0.8:
                 train.position = float(station.get("position", train.position))
                 train.speed = 0.0
                 train.acceleration_state = 0.0

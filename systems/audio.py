@@ -1,6 +1,8 @@
 """Randomized 81-760 rail-joint sounds and train audio."""
+import math
 import random
 import re
+import struct
 
 import pygame
 
@@ -97,15 +99,11 @@ class AudioSystem:
             # Rusich and async play together at low speed. Async fades out
             # between 25 and 40 km/h; the next motor layer comes in at higher speed.
             engine_dir = rolling_dir / "engine"
-            for filename in (
-                "engine_rusich.wav",
-                "async.wav",
-                "engine_loud_new.wav",
-            ):
-                try:
-                    self.engine_sounds.append(pygame.mixer.Sound(str(engine_dir / filename)))
-                except (pygame.error, OSError):
-                    self.engine_sounds.append(None)
+            self.engine_sounds = [
+                self._load_engine_sound(engine_dir, "engine_rusich.wav", (72.0, 2.4, 0.35)),
+                self._load_engine_sound(engine_dir, "async.wav", (95.0, 3.1, 0.65)),
+                self._load_engine_sound(engine_dir, "engine_loud_new.wav", (145.0, 4.0, 0.8)),
+            ]
 
             # Give each sound category its own channels. Track-joint sounds
             # must never steal a channel from the motor, brakes, or announcements.
@@ -189,6 +187,38 @@ class AudioSystem:
         except (pygame.error, OSError):
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
+
+    @staticmethod
+    def _make_motor_fallback(base_hz, modulation_hz, brightness=0.5):
+        """Synthesize a quiet loopable electric-motor bed if an asset is missing."""
+        sample_rate = 22050
+        duration_s = 2.0
+        sample_count = int(sample_rate * duration_s)
+        frames = bytearray()
+        for i in range(sample_count):
+            t = i / sample_rate
+            wobble = math.sin(2.0 * math.pi * modulation_hz * t) * 0.08
+            phase = 2.0 * math.pi * base_hz * t + wobble
+            value = (
+                math.sin(phase)
+                + brightness * 0.45 * math.sin(phase * 2.0)
+                + brightness * 0.22 * math.sin(phase * 3.0)
+                + 0.12 * math.sin(2.0 * math.pi * (base_hz * 0.5) * t)
+            ) * 0.18
+            # Slightly soften the loop edges to avoid a click at the seam.
+            edge = min(1.0, i / (sample_rate * 0.04),
+                       (sample_count - i - 1) / (sample_rate * 0.04))
+            sample = int(max(-1.0, min(1.0, value * edge)) * 32767)
+            frames.extend(struct.pack("<hh", sample, sample))
+        return pygame.mixer.Sound(buffer=bytes(frames))
+
+    def _load_engine_sound(self, engine_dir, filename, fallback):
+        try:
+            return pygame.mixer.Sound(str(engine_dir / filename))
+        except (pygame.error, OSError):
+            # Missing/empty motor files no longer leave the train silent.
+            # Keep async.wav as the real middle-speed layer when it exists.
+            return self._make_motor_fallback(*fallback)
 
     def play_door_sound(self):
         """Play the door sound at full volume for opening or closing."""

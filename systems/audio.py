@@ -60,6 +60,7 @@ class AudioSystem:
         self.door_ring_active = False
         self._door_ring_timer = 0.0
         self._door_ring_beeping = False
+        self._door_ring_volume = 1.0
         self.station_announcements = []
         self.station_announcement_index = 0
         self.station_announcer_enabled = False
@@ -226,11 +227,11 @@ class AudioSystem:
                 # Audio fallback is optional; rail-joint audio must still initialize.
                 return None
 
-    def play_door_sound(self):
-        """Play the door sound at full volume for opening or closing."""
-        if self.door_sound is not None and self.door_channel is not None:
+    def play_door_sound(self, volume=1.0):
+        """Play a door sound with distance-based volume attenuation."""
+        if self.door_sound is not None and self.door_channel is not None and volume > 0.01:
             self.door_channel.stop()
-            self.door_channel.set_volume(1.0)
+            self.door_channel.set_volume(max(0.0, min(1.0, volume)))
             self.door_channel.play(self.door_sound)
 
     def configure_station_announcements(self, station_count):
@@ -257,7 +258,7 @@ class AudioSystem:
                     continue
         self.station_announcement_index = 0
 
-    def toggle_station_announcer(self, train=None):
+    def toggle_station_announcer(self, train=None, volume=1.0):
         """Play exactly one next announcement each time I is pressed."""
         channel = self.station_announcement_channel
         if channel is None or not self.station_announcements:
@@ -272,20 +273,27 @@ class AudioSystem:
 
         sound, is_next_station = self.station_announcements[self.station_announcement_index]
         self.station_announcement_index += 1
-        channel.set_volume(1.0)
+        volume = max(0.0, min(1.0, volume))
+        if volume <= 0.01:
+            return
+        channel.set_volume(volume)
         channel.play(sound)
         if is_next_station:
-            self.start_door_ring()
+            self.start_door_ring(volume=volume)
 
-    def start_door_ring(self):
-        """Start repeating the door-closing beep: 0.5 s on, 0.5 s off."""
+    def start_door_ring(self, volume=1.0):
+        """Start repeating the door-closing beep with distance attenuation."""
         if self.door_ring_sound is None or self.door_ring_channel is None:
             return
         self.door_ring_active = True
+        self._door_ring_volume = max(0.0, min(1.0, volume))
+        if self._door_ring_volume <= 0.01:
+            self.door_ring_active = False
+            return
         self._door_ring_timer = 0.0
         self._door_ring_beeping = True
         self.door_ring_channel.stop()
-        self.door_ring_channel.set_volume(1.0)
+        self.door_ring_channel.set_volume(self._door_ring_volume)
         self.door_ring_channel.play(self.door_ring_sound)
 
     def stop_door_ring(self):
@@ -307,7 +315,7 @@ class AudioSystem:
         if self.door_ring_channel is None:
             return
         if self._door_ring_beeping:
-            self.door_ring_channel.set_volume(1.0)
+            self.door_ring_channel.set_volume(self._door_ring_volume)
             self.door_ring_channel.play(self.door_ring_sound)
         else:
             self.door_ring_channel.stop()

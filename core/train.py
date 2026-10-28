@@ -30,6 +30,10 @@ class Train:
         self.position = 0.0
         self.speed = 0.0
         self.emergency_brake_active = False
+        self.overspeed_emergency_active = False
+        self.overspeed_timer = 0.0
+        self.OVERSPEED_GRACE_S = 3.6
+        self.SPEED_MARGIN_KMH = 1.0
         self.acceleration_state = 0.0
         self.brake_applied = False
         self._brake_command_timer = 0.0
@@ -64,6 +68,23 @@ class Train:
             return
         dt = min(dt, 0.1)
         limit = self.als.speed_limit(line, self.position, self.max_speed)
+        limit_kmh = limit * 3.6
+        speed_kmh = abs(self.speed) * 3.6
+
+        # The automatic speed controller permits only a 1 km/h overshoot.
+        # The driver must bring the train back below the posted limit within 3.6 s.
+        if not self.overspeed_emergency_active:
+            if speed_kmh > limit_kmh:
+                self.overspeed_timer += dt
+                if self.overspeed_timer >= self.OVERSPEED_GRACE_S:
+                    self.overspeed_emergency_active = True
+            else:
+                self.overspeed_timer = 0.0
+
+        # A speed-enforcement emergency brake overrides every controller position.
+        self.emergency_brake_active = bool(
+            self.emergency_brake_active or self.overspeed_emergency_active
+        )
         grade_acceleration = line.path.grade_acceleration(self.position)
         resistance = self.rolling_resistance + self.speed_resistance * self.speed
         # Positive grade acceleration means gravity helps the train move forward.
@@ -89,7 +110,10 @@ class Train:
         self.brake_release_timer = max(0.0, self.brake_release_timer - dt)
 
         if self.brake_applied:
-            if self.emergency_brake_active:
+            if self.overspeed_emergency_active:
+                # Emergency braking is 1.3 times the strongest T3 service notch.
+                deceleration = self.brake_notches[-1] * 1.3
+            elif self.emergency_brake_active:
                 deceleration = self.emergency_brake
             else:
                 # T1 is gentle braking; T3 applies the strongest service braking.
@@ -127,7 +151,10 @@ class Train:
                 self.acceleration_state += max(
                     -change, min(change, target_acceleration - self.acceleration_state)
                 )
-                self.speed = max(0.0, min(limit, self.speed + self.acceleration_state * dt))
+                permitted_speed = limit + self.SPEED_MARGIN_KMH / 3.6
+                self.speed = max(
+                    0.0, min(permitted_speed, self.speed + self.acceleration_state * dt)
+                )
 
         self.position = min(max(0.0, line.path.total_length), self.position + self.speed * dt)
         if self.position >= line.path.total_length:

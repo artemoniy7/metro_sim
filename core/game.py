@@ -31,10 +31,13 @@ class Game:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_v:
-            self.doors_open = not self.doors_open
-            play_door_sound = getattr(self.audio, "play_door_sound", None)
-            if callable(play_door_sound):
-                play_door_sound()
+            # Doors may only be operated while the train is completely stopped.
+            if abs(self.train.speed) < 0.05:
+                self.doors_open = not self.doors_open
+                self.train.doors_open = self.doors_open
+                play_door_sound = getattr(self.audio, "play_door_sound", None)
+                if callable(play_door_sound):
+                    play_door_sound()
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
             toggle_announcer = getattr(self.audio, "toggle_station_announcer", None)
             if callable(toggle_announcer):
@@ -56,6 +59,10 @@ class Game:
     def update(self, dt):
         self.elapsed += dt
         self.controls.update(self.train, dt)
+        # Do not retain a traction command while the doors are open.
+        if self.doors_open and self.train.controller_notch > 0:
+            self.train.controller_notch = 0
+        self.train.doors_open = self.doors_open
         self.train.update(dt, self.line)
         self.camera.follow(self.train, self.line.path.total_length)
         self.audio.update(self.train, dt, self.camera)

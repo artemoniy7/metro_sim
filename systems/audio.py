@@ -272,6 +272,12 @@ class AudioSystem:
         brake_notch = 4 if train.emergency_brake_active else abs(min(0, train.controller_notch))
 
         if not braking:
+            # The release-air recording must not continue after the train starts moving.
+            if (self.brake_release_channel is not None
+                    and speed_kmh > 1.0
+                    and self.brake_release_channel.get_busy()):
+                self.brake_release_channel.stop()
+
             # Brake-release air sound plays once when the driver releases the brake.
             if self._was_braking:
                 for channel in (self.brake_channel, self.brake_channel_alt):

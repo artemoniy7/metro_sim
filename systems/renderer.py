@@ -16,24 +16,12 @@ class Renderer:
         self.door_open_amount = 0.0
         self.door_indicator_phase = 0.0
         self.tunnel_image = self._load_sprite(ASSETS_DIR / "track" / "tunnel.jpg")
-        # light.png is the signal sprite sheet; signal heads are drawn with
-        # simple lamp overlays so inactive conventional signals stay dark.
+        # Transparent signal sprite; lamp coordinates are in source-image pixels.
         self.signal_image = self._load_sprite(ASSETS_DIR / "track" / "light.png")
-        self.signal_heads = {}
-        if self.signal_image is not None:
-            # The supplied atlas has two-lamp and three-lamp heads at the
-            # coordinates provided for light.png. Crop the housing; the
-            # illuminated aspects are overlaid dynamically below.
-            atlas_w, atlas_h = self.signal_image.get_size()
-            crops = {
-                2: (385, 60, 90, 165),   # lamps near (437, 101) and (437, 190)
-                3: (315, 405, 95, 350),  # lamps near (363, 451), (363, 585), (363, 724)
-            }
-            for lamp_count, (cx, cy, cw, ch) in crops.items():
-                if cx >= 0 and cy >= 0 and cx + cw <= atlas_w and cy + ch <= atlas_h:
-                    self.signal_heads[lamp_count] = self.signal_image.subsurface(
-                        (cx, cy, cw, ch)
-                    ).copy()
+        self.signal_lamp_points = {
+            2: ((437, 101), (437, 190)),
+            3: ((363, 451), (363, 585), (363, 724)),
+        }
         self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
         self.vehicle_angles = {}
         self._station_tile_cache = {}
@@ -296,38 +284,54 @@ class Renderer:
 
         for signal in line.signals:
             x = int((line.path.total_length - signal.position - camera_x) * scale)
-            if -30 < x < width + 30:
+            if -40 < x < width + 40:
                 sy = rail_y_at(max(0, min(width - 1, x)))
-                # All signals face left, toward the approaching train.
                 pole_color = (88, 91, 98) if signal.operational else (65, 67, 72)
-                head_y = sy - 55
-                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y - 4), 3)
-                head_sprite = self.signal_heads.get(signal.lamp_count)
-                if head_sprite is not None:
-                    sprite_height = 31 if signal.lamp_count == 2 else 48
-                    sprite_width = max(12, round(sprite_height * head_sprite.get_width() / head_sprite.get_height()))
-                    scaled_head = pygame.transform.smoothscale(head_sprite, (sprite_width, sprite_height))
-                    surface.blit(scaled_head, (x - sprite_width + 1, head_y - 5))
-                head_width = 15 if signal.lamp_count == 2 else 18
-                head_height = 27 if signal.lamp_count == 2 else 38
-                head_rect = pygame.Rect(x - head_width - 2, head_y - 2, head_width + 4, head_height + 4)
-                pygame.draw.rect(surface, (20, 22, 26), head_rect, border_radius=4)
-                pygame.draw.rect(surface, pole_color, head_rect, 1, border_radius=4)
+                head_height = max(18, min(64, round(5.0 * scale)))
+                head_width = max(10, min(34, round(2.1 * scale)))
+                head_y = sy - head_height - max(3, round(1.0 * scale))
+                pygame.draw.line(surface, pole_color, (x, sy - 1), (x, head_y), max(2, round(0.35 * scale)))
 
-                lamp_color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"])
-                if signal.lamp_count == 2:
-                    lamp_points = [(x - 10, head_y + 5), (x - 10, head_y + 18)]
-                else:
-                    lamp_points = [(x - 11, head_y + 5), (x - 11, head_y + 18), (x - 11, head_y + 31)]
-                for lamp_index, point in enumerate(lamp_points):
-                    color = lamp_color if signal.operational and lamp_index == 0 else (45, 47, 51)
-                    if signal.aspect == "yellow" and lamp_index == 1:
-                        color = lamp_color
-                    elif signal.aspect == "red" and lamp_index == 2:
-                        color = lamp_color
-                    pygame.draw.circle(surface, color, point, 4)
+                sprite_drawn = False
+                if self.signal_image is not None:
+                    source_w, source_h = self.signal_image.get_size()
+                    if source_w > 0 and source_h > 0:
+                        target_h = head_height
+                        target_w = max(1, round(source_w * target_h / source_h))
+                        sprite = pygame.transform.smoothscale(self.signal_image, (target_w, target_h))
+                        # Anchor the two-lamp sprite at its first lamp coordinate.
+                        anchor = self.signal_lamp_points.get(signal.lamp_count, ((437, 101),))[0]
+                        sprite_x = x - round(anchor[0] * target_w / source_w)
+                        sprite_y = head_y - round(anchor[1] * target_h / source_h)
+                        surface.blit(sprite, (sprite_x, sprite_y))
+                        points = self.signal_lamp_points.get(signal.lamp_count, ())
+                        if points and signal.operational and signal.aspect != "dark":
+                            lamp_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+                            color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"])
+                            for lamp_x, lamp_y in points:
+                                px = sprite_x + round(lamp_x * target_w / source_w)
+                                py = sprite_y + round(lamp_y * target_h / source_h)
+                                beam_len = max(12, round(8.0 * scale))
+                                beam_half = max(5, round(2.4 * scale))
+                                pygame.draw.polygon(lamp_surface, (*color, 72), [
+                                    (px, py), (px - beam_len, py - beam_half),
+                                    (px - beam_len, py + beam_half),
+                                ])
+                            surface.blit(lamp_surface, (0, 0))
+                        sprite_drawn = True
+
+                if not sprite_drawn:
+                    # Fallback head has fixed world dimensions and uses the same scale.
+                    body = pygame.Rect(x - head_width, head_y, head_width, head_height)
+                    pygame.draw.rect(surface, (20, 22, 26), body, border_radius=max(2, head_width // 5))
+                    pygame.draw.rect(surface, pole_color, body, max(1, round(0.25 * scale)), border_radius=max(2, head_width // 5))
+                    for lamp_index in range(signal.lamp_count):
+                        lamp_y = head_y + round((lamp_index + 0.5) * head_height / signal.lamp_count)
+                        color = signal.ASPECTS.get(signal.aspect, signal.ASPECTS["dark"]) if signal.operational else (45, 47, 51)
+                        pygame.draw.circle(surface, color, (x - head_width // 2, lamp_y), max(2, round(0.45 * scale)))
+
                 if signal.operational:
-                    surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 7, sy - 66))
+                    surface.blit(self.small_font.render(signal.name, True, (205, 210, 218)), (x + 7, sy - head_height - 12))
 
         loco_x = (line.path.total_length - train.position - train.loco_length_m - camera_x) * scale
         loco_width = max(1, round(train.loco_length_m * scale))

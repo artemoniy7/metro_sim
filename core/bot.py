@@ -57,16 +57,22 @@ class BotTrain:
 
         station = self._next_station(line)
         self.target_station = station
+        # Keep 2 km/h below the current ALS-ARS indication.
+        indication_kmh, _ = line.block_indication(train.position)
+        target_speed = max(0.0, float(indication_kmh) - 2.0) / 3.6
+
         if station is not None:
             distance = float(station.get("position", 0)) - train.position
-            # Begin service braking according to stopping distance, with a
-            # small margin for the train's one-second brake response.
             speed = max(0.0, train.speed)
             stopping_distance = speed * speed / (2.0 * max(0.55, train.brake_notches[-1]))
             if distance <= stopping_distance + max(35.0, speed * 1.2):
                 train.controller_notch = -3 if speed > 4.0 else -2
-            else:
+            elif speed > target_speed + (1.0 / 3.6):
+                train.controller_notch = -1
+            elif speed < target_speed - (1.0 / 3.6):
                 train.controller_notch = 4
+            else:
+                train.controller_notch = 0
 
             if distance <= 3.0 and train.speed <= 0.8:
                 train.position = float(station.get("position", train.position))
@@ -87,8 +93,14 @@ class BotTrain:
                         announce(train)
                 return
         else:
-            # End of the line: the manager will recycle this train at zero speed.
-            train.controller_notch = -3 if train.speed > 1.0 else 0
+            # Regulate speed on the open line; braking for stations takes priority.
+            speed = max(0.0, train.speed)
+            if speed > target_speed + (1.0 / 3.6):
+                train.controller_notch = -1
+            elif speed < target_speed - (1.0 / 3.6):
+                train.controller_notch = 4
+            else:
+                train.controller_notch = 0
 
         train.doors_open = False
         train.update(dt, line)

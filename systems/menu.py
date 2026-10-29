@@ -126,7 +126,10 @@ class MainMenu:
             train_x = draw_rect.x - 45 + int(hover * 52)
             self._draw_train(surface, train_x, draw_rect.centery)
         text = self.button_font.render(label, True, self.TEXT)
-        text_rect = text.get_rect(midleft=(draw_rect.x + 22, draw_rect.centery))
+        label_offset = int(hover * 42)
+        if leaving:
+            label_offset = int(42 * (1.0 - click))
+        text_rect = text.get_rect(midleft=(draw_rect.x + 22 + label_offset, draw_rect.centery))
         surface.blit(text, text_rect)
         if primary:
             arrow = self.button_font.render("→", True, self.TEXT)

@@ -40,6 +40,7 @@ class Game:
         # two minutes and are recycled to the line start after the terminus.
         self.bot_trains = []
         self.bot_dispatch_interval = 120.0
+        self.bots_enabled = self.train.position <= 0.01
         self.bot_dispatch_timer = 0.0
         self.bot_number = 0
         # Put the first AI train into service immediately; subsequent trains
@@ -102,7 +103,7 @@ class Game:
         self.train.doors_open = self.doors_open
 
         self.bot_dispatch_timer += dt
-        if self.bot_dispatch_timer >= self.bot_dispatch_interval:
+        if self.bots_enabled and self.bot_dispatch_timer >= self.bot_dispatch_interval:
             self.bot_dispatch_timer -= self.bot_dispatch_interval
             self._dispatch_bot()
 

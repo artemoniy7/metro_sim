@@ -28,6 +28,12 @@ class MainMenu:
         self.small_font = self._load_font(font_dir / "IBMPlexSans-Regular.ttf", 15)
         self.settings_font = self._load_font(font_dir / "IBMPlexSans-SemiBold.ttf", 30, bold=True)
 
+        image_path = Path(__file__).resolve().parent.parent / "assets" / "ui" / "image" / "main-menu.jpeg"
+        try:
+            self.background_image = pygame.image.load(str(image_path)).convert()
+        except (FileNotFoundError, pygame.error):
+            self.background_image = None
+
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.settings_open:
@@ -58,7 +64,7 @@ class MainMenu:
             return pygame.font.SysFont("arial", size, bold=bold)
 
     def update(self, dt):
-        """Animate the little train and return an action after its departure."""
+        """Animate button movement and return an action after the transition."""
         mouse_pos = pygame.mouse.get_pos()
         for key in self.hover_progress:
             rect = self.buttons.get(key)
@@ -87,30 +93,20 @@ class MainMenu:
     def _text(surface, text, font, color, position):
         surface.blit(font.render(text, True, color), position)
 
-    def _draw_train(self, surface, x, center_y, progress=1.0):
-        """Draw a tiny, original metro carriage using simple Pygame shapes."""
-        w, h = 39, 22
-        body = pygame.Rect(int(x), int(center_y - h / 2), w, h)
-        pygame.draw.rect(surface, (235, 238, 242), body, border_radius=5)
-        pygame.draw.rect(surface, self.ACCENT, (body.x + 2, body.y + 3, w - 4, 4), border_radius=2)
-        for i in range(3):
-            pygame.draw.rect(surface, (58, 76, 91), (body.x + 5 + i * 9, body.y + 9, 7, 6), border_radius=1)
-        pygame.draw.circle(surface, (15, 19, 25), (body.x + 9, body.bottom - 1), 3)
-        pygame.draw.circle(surface, (15, 19, 25), (body.right - 9, body.bottom - 1), 3)
-
     def _button(self, surface, key, label, rect, mouse_pos, primary=False):
         self.buttons[key] = rect
         hovered = rect.collidepoint(mouse_pos)
         hover = self.hover_progress.get(key, 0.0)
         leaving = self.pending_action == key
         click = self.click_progress if leaving else 0.0
-        scale = 1.0 + 0.025 * hover + 0.045 * click
+
+        # A restrained slide and scale replace the train animation.
+        scale = 1.0 + 0.025 * hover + 0.035 * click
         draw_rect = rect.copy()
         draw_rect.width = int(rect.width * scale)
         draw_rect.height = int(rect.height * scale)
-        draw_rect.center = (rect.centerx + int(5 * hover), rect.centery)
-        if leaving:
-            draw_rect.centerx += int(70 * click)
+        draw_rect.center = (rect.centerx + int(7 * hover + 42 * click), rect.centery)
+
         color = self.ACCENT if primary else (self.PANEL_HOVER if hovered else self.PANEL)
         if primary and hovered:
             color = (239, 62, 72)
@@ -118,18 +114,8 @@ class MainMenu:
         if not primary:
             pygame.draw.rect(surface, self.LINE, draw_rect, 1, border_radius=8)
 
-        # The train glides in from the left on hover and departs to the right on click.
-        if leaving:
-            train_x = draw_rect.x + 18 + int((draw_rect.width - 5) * click)
-            self._draw_train(surface, train_x, draw_rect.centery)
-        elif hover > 0.02:
-            train_x = draw_rect.x - 45 + int(hover * 52)
-            self._draw_train(surface, train_x, draw_rect.centery)
         text = self.button_font.render(label, True, self.TEXT)
-        label_offset = int(hover * 42)
-        if leaving:
-            label_offset = int(42 * (1.0 - click))
-        text_rect = text.get_rect(midleft=(draw_rect.x + 22 + label_offset, draw_rect.centery))
+        text_rect = text.get_rect(midleft=(draw_rect.x + 22, draw_rect.centery))
         surface.blit(text, text_rect)
         if primary:
             arrow = self.button_font.render("→", True, self.TEXT)
@@ -141,19 +127,37 @@ class MainMenu:
         self.buttons.clear()
         surface.fill(self.BG)
 
-        # Quiet architectural shapes provide atmosphere without suggesting a specific metro line.
-        right = int(width * 0.59)
-        for i in range(5):
-            inset = i * int(width * 0.035)
-            rect = pygame.Rect(right + inset, int(height * 0.14) + i * 14,
-                               max(1, width - right - inset * 2), int(height * 0.68) - i * 28)
-            if rect.width > 0 and rect.height > 0:
-                pygame.draw.rect(surface, (18 + i * 2, 23 + i * 2, 31 + i * 2),
-                                 rect, width=2, border_radius=4)
+        # The user's metro photo sits quietly on the right, darkened so the menu stays readable.
+        right = int(width * 0.53)
+        if self.background_image is not None:
+            target_w = width - right
+            target_h = int(height * 0.84)
+            image_ratio = self.background_image.get_width() / self.background_image.get_height()
+            target_ratio = target_w / target_h
+            if image_ratio > target_ratio:
+                scaled_h = target_h
+                scaled_w = int(scaled_h * image_ratio)
+            else:
+                scaled_w = target_w
+                scaled_h = int(scaled_w / image_ratio)
+            image = pygame.transform.smoothscale(self.background_image, (scaled_w, scaled_h))
+            crop = pygame.Rect(max(0, (scaled_w - target_w) // 2), 0, target_w, target_h)
+            image = image.subsurface(crop).copy()
+            image.set_alpha(105)
+            surface.blit(image, (right, int(height * 0.08)))
+            shade = pygame.Surface((target_w, target_h), pygame.SRCALPHA)
+            shade.fill((15, 19, 25, 115))
+            surface.blit(shade, (right, int(height * 0.08)))
+        else:
+            for i in range(5):
+                inset = i * int(width * 0.035)
+                rect = pygame.Rect(right + inset, int(height * 0.14) + i * 14,
+                                   max(1, width - right - inset * 2), int(height * 0.68) - i * 28)
+                if rect.width > 0 and rect.height > 0:
+                    pygame.draw.rect(surface, (18 + i * 2, 23 + i * 2, 31 + i * 2),
+                                     rect, width=2, border_radius=4)
         pygame.draw.line(surface, (37, 44, 54), (right, int(height * 0.82)),
                          (width - 40, int(height * 0.82)), 2)
-        pygame.draw.line(surface, (37, 44, 54), (right + 35, int(height * 0.86)),
-                         (width - 70, int(height * 0.86)), 1)
 
         left = int(width * 0.09)
         top = int(height * 0.23)

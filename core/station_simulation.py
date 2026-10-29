@@ -68,9 +68,15 @@ class StationSimulation:
                 if self._boarding_timers[index] >= 0.5:
                     intervals = int(self._boarding_timers[index] / 0.5)
                     self._boarding_timers[index] %= 0.5
-                    self.passengers[index] = max(
-                        0, self.passengers[index] - intervals * random.randint(1, 3)
-                    )
+                    # Every wagon has several doors, so boarding happens in
+                    # parallel instead of modelling a single narrow entrance.
+                    # Approx. 4 doors per wagon, each boarding 1-2 people per
+                    # half-second interval.
+                    wagon_count = max(1, len(getattr(train, "wagons", [])))
+                    doors_per_wagon = 4
+                    passengers_per_door = random.randint(1, 2)
+                    boarded = intervals * wagon_count * doors_per_wagon * passengers_per_door
+                    self.passengers[index] = max(0, self.passengers[index] - boarded)
                 break
 
     def station_at_position(self, position, extra_distance=0.0):

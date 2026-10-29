@@ -165,7 +165,7 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False, other_trains=None):
+    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False, other_trains=None, station_simulation=None):
         width, height = surface.get_size()
         if self.last_render_time is None:
             frame_dt = 1.0 / 60.0
@@ -430,7 +430,7 @@ class Renderer:
                 surface.blit(bot_label, (round(bot_x), max(220, round(rail_y_at(bot_x) - 68))))
 
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
-        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 430, 190), border_radius=8)
+        pygame.draw.rect(surface, (12, 15, 20), (16, 16, 455, 245), border_radius=8)
         surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
         surface.blit(self.small_font.render(f"АЛС-АРС: {train.als.indication_kmh:.0f} км/ч", True, (245, 205, 105)), (30, 89))
@@ -451,3 +451,12 @@ class Renderer:
             next_text = "Конечная станция"
         surface.blit(self.small_font.render(next_text, True, (230, 150, 155)), (465, 25))
         surface.blit(self.small_font.render("A/← тормоз   D/→ тяга   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 173))
+        if station_simulation is not None:
+            surface.blit(self.font.render(f"Время: {station_simulation.clock_text}", True, (245, 245, 245)), (30, 198))
+            surface.blit(self.small_font.render(station_simulation.period_text, True,
+                                                (255, 190, 100) if station_simulation.is_peak else (150, 210, 230)), (220, 204))
+            station_index, nearby_station, station_distance = station_simulation.nearest_station(train.position)
+            if nearby_station is not None:
+                passenger_count = station_simulation.passengers.get(station_index, 0)
+                label = f"Станция: {nearby_station.get('name', '—')} | Ожидают: {passenger_count}"
+                surface.blit(self.small_font.render(label, True, (190, 220, 190)), (30, 226))

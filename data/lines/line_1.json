@@ -520,5 +520,8 @@
       "position_status": "approximate"
     }
   ],
-  "signals": []
+  "signals": [],
+  "max_platform_length_m": 162,
+  "max_platform_length_status": "provisional_standard",
+  "platform_length_note": "Предварительный максимум для моделирования; уточнить по паспортным данным каждой станции. Не путать с длиной состава."
 }

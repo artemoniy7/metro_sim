@@ -1,5 +1,6 @@
 """Simple full-screen main menu for Metro Sim."""
 import pygame
+from pathlib import Path
 
 
 class MainMenu:
@@ -15,11 +16,13 @@ class MainMenu:
         self.width, self.height = size
         self.settings_open = False
         self.buttons = {}
-        self.title_font = pygame.font.SysFont("arial", 58, bold=True)
-        self.subtitle_font = pygame.font.SysFont("arial", 22)
-        self.button_font = pygame.font.SysFont("arial", 22)
-        self.small_font = pygame.font.SysFont("arial", 15)
-        self.settings_font = pygame.font.SysFont("arial", 30, bold=True)
+        # Use the bundled IBM Plex Sans family, with a system-font fallback.
+        font_dir = Path(__file__).resolve().parent.parent / "assets" / "ui" / "fonts"
+        self.title_font = self._load_font(font_dir / "IBMPlexSans-Bold.ttf", 58, bold=True)
+        self.subtitle_font = self._load_font(font_dir / "IBMPlexSans-Regular.ttf", 22)
+        self.button_font = self._load_font(font_dir / "IBMPlexSans-Medium.ttf", 22)
+        self.small_font = self._load_font(font_dir / "IBMPlexSans-Regular.ttf", 15)
+        self.settings_font = self._load_font(font_dir / "IBMPlexSans-SemiBold.ttf", 30, bold=True)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -40,6 +43,13 @@ class MainMenu:
             if self.buttons.get("quit", pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
                 return "quit"
         return None
+
+    @staticmethod
+    def _load_font(path, size, bold=False):
+        try:
+            return pygame.font.Font(str(path), size)
+        except (FileNotFoundError, pygame.error):
+            return pygame.font.SysFont("arial", size, bold=bold)
 
     def update(self, dt):
         """Keep the menu interface compatible with the main game loop."""

@@ -17,7 +17,7 @@ class Game:
         self.renderer = Renderer()
         self.controls = InputController()
         self.audio = AudioSystem()
-        self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
+        self.line_data = load_json(DATA_DIR / "lines" / "line_9.json", default={})
         self.line = Line(self.line_data)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):

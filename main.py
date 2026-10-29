@@ -33,7 +33,17 @@ def main():
             action = menu.update(dt)
             if action == "start":
                 from core.game import Game
-                game = Game()
+                line_meta, line_path, line_data = menu.selected_line
+                train_path, train_data = menu.selected_train
+                stations = line_data.get("stations", [])
+                end_index = min(menu.end_index, len(stations) - 1)
+                end_position = float(stations[end_index].get("position", line_data.get("total_length_m", 0)))
+                game = Game(
+                    line_file=line_path.name,
+                    train_file=train_path.name,
+                    start_position=menu.selected_start_position,
+                    end_position=end_position,
+                )
                 scene = "game"
             elif action == "quit":
                 running = False

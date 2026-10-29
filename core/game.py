@@ -19,6 +19,9 @@ class Game:
         self.audio = AudioSystem()
         self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
         self.line = Line(self.line_data)
+        configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
+        if callable(configure_station_joints):
+            configure_station_joints(self.line.stations)
         self.station_simulation = StationSimulation(self.line.stations)
         configure_announcements = getattr(self.audio, "configure_station_announcements", None)
         if callable(configure_announcements):

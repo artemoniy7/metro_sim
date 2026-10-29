@@ -24,17 +24,19 @@ def main():
                 continue
             if scene == "menu":
                 action = menu.handle_event(event)
-                if action == "start":
-                    from core.game import Game
-                    game = Game()
-                    scene = "game"
-                elif action == "quit":
+                if action == "quit":
                     running = False
             elif game is not None:
                 game.handle_event(event)
 
         if scene == "menu":
-            menu.update(dt)
+            action = menu.update(dt)
+            if action == "start":
+                from core.game import Game
+                game = Game()
+                scene = "game"
+            elif action == "quit":
+                running = False
             menu.render(screen)
         elif game is not None:
             game.update(dt)

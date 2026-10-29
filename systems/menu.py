@@ -41,6 +41,10 @@ class MainMenu:
                 return "quit"
         return None
 
+    def update(self, dt):
+        """Keep the menu interface compatible with the main game loop."""
+        pass
+
     @staticmethod
     def _text(surface, text, font, color, position):
         surface.blit(font.render(text, True, color), position)

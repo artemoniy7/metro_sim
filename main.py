@@ -6,7 +6,9 @@ from systems.menu import MainMenu
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME)
+    # Borderless desktop-sized window avoids exclusive fullscreen flicker on Windows.
+    desktop = pygame.display.Info()
+    screen = pygame.display.set_mode((desktop.current_w, desktop.current_h), pygame.NOFRAME)
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
     menu = MainMenu(WINDOW_SIZE)

@@ -26,10 +26,14 @@ class MainMenu:
         self.available_lines = []
         for item in self.line_catalog:
             path = DATA / "lines" / item.get("file", "")
-            if path.is_file():
-                data = self._read_json(path, {})
-                if data.get("stations") and data.get("points"):
-                    self.available_lines.append((item, path, data))
+            if not path.is_file():
+                continue
+            data = self._read_json(path, {})
+            # A catalog entry is playable only when its data explicitly identifies
+            # the same real metro line. This keeps test routes out of the line list.
+            if (data.get("stations") and data.get("points")
+                    and data.get("line_id") == item.get("id")):
+                self.available_lines.append((item, path, data))
         self.train_options = []
         for filename in ("81-760.json", "81-717.json", "81-740.json"):
             path = DATA / "trains" / filename
@@ -130,6 +134,16 @@ class MainMenu:
                     self.line_index = index
                     self.start_index = 0
                     self.end_index = max(1, len(self.selected_line[2].get("stations", [])) - 1)
+            elif key.startswith("station_"):
+                index = int(key.split("_")[1])
+                if index == self.start_index:
+                    pass
+                elif index == self.end_index:
+                    pass
+                elif index < self.end_index:
+                    self.start_index = index
+                else:
+                    self.end_index = index
             elif key == "start_prev":
                 self.start_index = max(0, self.start_index - 1)
                 if self.end_index <= self.start_index:
@@ -234,22 +248,46 @@ class MainMenu:
         self._text(surface, end.get("name", ""), self.button_font, self.TEXT, (int(w*.34), 340))
         self._button(surface, "end_prev", "‹", pygame.Rect(int(w*.34), 371, 42, 34))
         self._button(surface, "end_next", "›", pygame.Rect(int(w*.34)+50, 371, 42, 34))
-        # Schematic route map, with stations in their actual order.
-        map_rect = pygame.Rect(int(w*.055), 425, int(w*.89), 56)
-        pygame.draw.rect(surface, (19, 26, 35), map_rect, border_radius=8)
+        # Draw this line's own station geography (coordinates when available).
+        # If coordinates are absent, fall back to a line-specific station sequence.
+        map_rect = pygame.Rect(int(w*.055), 420, int(w*.89), 82)
+        pygame.draw.rect(surface, (19, 26, 35), map_rect, border_radius=9)
         color = tuple(meta.get("color", [214, 8, 59]))
-        left, right = map_rect.x+18, map_rect.right-18
-        cy = map_rect.centery
-        pygame.draw.line(surface, color, (left, cy), (right, cy), 5)
-        count = len(stations)
-        for i, station in enumerate(stations):
-            px = left + int((right-left) * i / max(1, count-1))
+        coords = [(st.get("longitude"), st.get("latitude")) for st in stations]
+        has_coords = all(lon is not None and lat is not None for lon, lat in coords)
+        if has_coords:
+            xs = [float(p[0]) for p in coords]
+            ys = [float(p[1]) for p in coords]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            span_x, span_y = max(max_x-min_x, 0.00001), max(max_y-min_y, 0.00001)
+            pad_x, pad_y = 22, 17
+            usable_w, usable_h = map_rect.width-2*pad_x, map_rect.height-2*pad_y
+            raw = [(map_rect.x+pad_x+(x-min_x)/span_x*usable_w,
+                    map_rect.y+pad_y+(max_y-y)/span_y*usable_h) for x,y in zip(xs,ys)]
+        else:
+            raw = [(map_rect.x+18+i*(map_rect.width-36)/max(1,len(stations)-1),
+                    map_rect.centery + (12 if i % 2 else -12)) for i in range(len(stations))]
+        route_points = [(int(x), int(y)) for x,y in raw]
+        if len(route_points) > 1:
+            pygame.draw.lines(surface, (75, 88, 103), False, route_points, 7)
+            pygame.draw.lines(surface, color, False, route_points, 4)
+        for i, (px, py) in enumerate(route_points):
             active = self.start_index <= i <= self.end_index
-            pygame.draw.circle(surface, color if active else (83, 94, 108), (px, cy), 5 if active else 3)
+            node_color = color if active else (88, 101, 116)
+            pygame.draw.circle(surface, node_color, (px,py), 6 if active else 4)
             if i in (self.start_index, self.end_index):
-                pygame.draw.circle(surface, self.TEXT, (px, cy), 9, 2)
-        self._text(surface, f'{len(stations)} станций  •  схема порядка станций, не географическая карта',
-                   self.small, self.MUTED, (map_rect.x+10, map_rect.bottom+7))
+                pygame.draw.circle(surface, self.TEXT, (px,py), 10, 2)
+            # All stations can be selected directly on the route.
+            hit = pygame.Rect(px-10, py-10, 20, 20)
+            self._add_button(f"station_{i}", hit)
+            if i in (0, len(stations)-1, self.start_index, self.end_index) or i % max(1, len(stations)//8) == 0:
+                label = self.small.render(stations[i].get("name", ""), True, self.TEXT if active else self.MUTED)
+                label_x = max(map_rect.x+3, min(px-label.get_width()//2, map_rect.right-label.get_width()-3))
+                label_y = map_rect.bottom-19 if py < map_rect.centery else map_rect.y+2
+                surface.blit(label, (label_x, label_y))
+        self._text(surface, f'{len(stations)} станций  •  нажми на точку, чтобы выбрать станцию',
+                   self.small, self.MUTED, (map_rect.x+8, map_rect.bottom+4))
         self._text(surface, "3. Выбери поезд", self.body, self.MUTED, (int(w*.055), 505))
         train_y = 535
         train_w = min(230, int(w*.19))

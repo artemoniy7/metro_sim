@@ -32,7 +32,8 @@ class MainMenu:
             # A catalog entry is playable only when its data explicitly identifies
             # the same real metro line. This keeps test routes out of the line list.
             if (data.get("stations") and data.get("points")
-                    and data.get("line_id") == item.get("id")):
+                    and (data.get("line_id") == item.get("id")
+                         or str(data.get("line_number", "")) == str(item.get("number", "")))):
                 self.available_lines.append((item, path, data))
         self.train_options = []
         for filename in ("81-760.json", "81-717.json", "81-740.json"):

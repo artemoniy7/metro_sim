@@ -1,25 +1,46 @@
 """Entry point for Metro Sim."""
 import pygame
 from settings import WINDOW_SIZE, WINDOW_TITLE, FPS
-from core.game import Game
+from systems.menu import MainMenu
+
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode(WINDOW_SIZE)
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
-    game = Game()
+    menu = MainMenu(WINDOW_SIZE)
+    game = None
+    scene = "menu"
     running = True
+
     while running:
         dt = min(clock.tick(FPS) / 1000.0, 0.05)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            game.handle_event(event)
-        game.update(dt)
-        game.render(screen)
+                continue
+            if scene == "menu":
+                action = menu.handle_event(event)
+                if action == "start":
+                    from core.game import Game
+                    game = Game()
+                    scene = "game"
+                elif action == "quit":
+                    running = False
+            elif game is not None:
+                game.handle_event(event)
+
+        if scene == "menu":
+            menu.update(dt)
+            menu.render(screen)
+        elif game is not None:
+            game.update(dt)
+            game.render(screen)
         pygame.display.flip()
+
     pygame.quit()
+
 
 if __name__ == "__main__":
     main()

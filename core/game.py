@@ -13,11 +13,12 @@ from systems.audio import AudioSystem
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, line_file=None, train_file=None, start_position=0.0, end_position=None):
         self.renderer = Renderer()
         self.controls = InputController()
         self.audio = AudioSystem()
-        self.line_data = load_json(DATA_DIR / "lines" / "line_9.json", default={})
+        line_path = DATA_DIR / "lines" / (line_file or "line_9.json")
+        self.line_data = load_json(line_path, default={})
         self.line = Line(self.line_data)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):
@@ -26,8 +27,11 @@ class Game:
         configure_announcements = getattr(self.audio, "configure_station_announcements", None)
         if callable(configure_announcements):
             configure_announcements(len(self.line.stations))
-        train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
+        train_path = DATA_DIR / "trains" / (train_file or "81-760.json")
+        train_data = load_json(train_path, default={})
         self.train = Train(train_data)
+        self.train.position = max(0.0, float(start_position))
+        self.end_position = float(end_position) if end_position is not None else self.line.path.total_length
         # Close view of the locomotive, with mouse-wheel zoom and consist panning.
         self.camera = Camera(WINDOW_SIZE, zoom=2.8)
         self.elapsed = 0.0
@@ -40,7 +44,9 @@ class Game:
         self.bot_number = 0
         # Put the first AI train into service immediately; subsequent trains
         # are dispatched every two minutes.
-        self._dispatch_bot()
+        # AI traffic is enabled only when starting from the line origin.
+        if self.train.position <= 0.01:
+            self._dispatch_bot()
 
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
@@ -104,6 +110,10 @@ class Game:
         # updates this frame. This keeps following trains from driving through.
         self.line.traffic_trains = [self.train] + [bot.train for bot in self.bot_trains]
         self.train.update(dt, self.line)
+        if self.train.position >= self.end_position:
+            self.train.position = self.end_position
+            self.train.speed = 0.0
+            self.train.controller_notch = 0
         for bot in list(self.bot_trains):
             bot.update(dt, self.line, self.audio,
                        seconds_to_dispatch=self.bot_dispatch_interval - self.bot_dispatch_timer)

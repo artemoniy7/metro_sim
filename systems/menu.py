@@ -28,12 +28,6 @@ class MainMenu:
         self.small_font = self._load_font(font_dir / "IBMPlexSans-Regular.ttf", 15)
         self.settings_font = self._load_font(font_dir / "IBMPlexSans-SemiBold.ttf", 30, bold=True)
 
-        image_path = Path(__file__).resolve().parent.parent / "assets" / "ui" / "image" / "main-menu.jpeg"
-        try:
-            self.background_image = pygame.image.load(str(image_path)).convert()
-        except (FileNotFoundError, pygame.error):
-            self.background_image = None
-
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.settings_open:
@@ -127,37 +121,31 @@ class MainMenu:
         self.buttons.clear()
         surface.fill(self.BG)
 
-        # The user's metro photo sits quietly on the right, darkened so the menu stays readable.
-        right = int(width * 0.53)
-        if self.background_image is not None:
-            target_w = width - right
-            target_h = int(height * 0.84)
-            image_ratio = self.background_image.get_width() / self.background_image.get_height()
-            target_ratio = target_w / target_h
-            if image_ratio > target_ratio:
-                scaled_h = target_h
-                scaled_w = int(scaled_h * image_ratio)
-            else:
-                scaled_w = target_w
-                scaled_h = int(scaled_w / image_ratio)
-            image = pygame.transform.smoothscale(self.background_image, (scaled_w, scaled_h))
-            crop = pygame.Rect(max(0, (scaled_w - target_w) // 2), 0, target_w, target_h)
-            image = image.subsurface(crop).copy()
-            image.set_alpha(105)
-            surface.blit(image, (right, int(height * 0.08)))
-            shade = pygame.Surface((target_w, target_h), pygame.SRCALPHA)
-            shade.fill((15, 19, 25, 115))
-            surface.blit(shade, (right, int(height * 0.08)))
-        else:
-            for i in range(5):
-                inset = i * int(width * 0.035)
-                rect = pygame.Rect(right + inset, int(height * 0.14) + i * 14,
-                                   max(1, width - right - inset * 2), int(height * 0.68) - i * 28)
-                if rect.width > 0 and rect.height > 0:
-                    pygame.draw.rect(surface, (18 + i * 2, 23 + i * 2, 31 + i * 2),
-                                     rect, width=2, border_radius=4)
-        pygame.draw.line(surface, (37, 44, 54), (right, int(height * 0.82)),
-                         (width - 40, int(height * 0.82)), 2)
+        # Subtle perspective strokes suggest a tunnel without boxing off the background.
+        right = int(width * 0.57)
+        vanish_x, vanish_y = int(width * 0.84), int(height * 0.40)
+        line_colors = [(19, 24, 32), (22, 28, 37), (26, 32, 41)]
+        anchors = [
+            ((right, int(height * 0.05)), (width - 18, int(height * 0.01))),
+            ((right - 12, int(height * 0.25)), (width - 8, int(height * 0.12))),
+            ((right - 28, int(height * 0.52)), (width - 5, int(height * 0.38))),
+            ((right - 45, int(height * 0.80)), (width - 20, int(height * 0.72))),
+            ((right - 60, int(height * 0.98)), (width - 35, int(height * 0.99))),
+        ]
+        for i, (a, b) in enumerate(anchors):
+            pygame.draw.line(surface, line_colors[i % len(line_colors)], a, (vanish_x, vanish_y), 2)
+            pygame.draw.line(surface, line_colors[i % len(line_colors)], (vanish_x, vanish_y), b, 2)
+
+        # A faint red light accent adds depth while keeping the right side understated.
+        accent_points = [
+            (int(width * 0.76), int(height * 0.13)),
+            (int(width * 0.80), int(height * 0.23)),
+            (int(width * 0.83), int(height * 0.35)),
+            (int(width * 0.85), int(height * 0.47)),
+        ]
+        pygame.draw.lines(surface, (42, 24, 32), False, accent_points, 2)
+        pygame.draw.line(surface, (31, 38, 47), (right, int(height * 0.82)),
+                         (width - 40, int(height * 0.82)), 1)
 
         left = int(width * 0.09)
         top = int(height * 0.23)

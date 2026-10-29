@@ -102,9 +102,6 @@ class MainMenu:
                      pygame.Rect(button_x, button_y + 74, button_width, 52), pygame.mouse.get_pos())
         self._button(surface, "quit", "Выход",
                      pygame.Rect(button_x, button_y + 140, button_width, 52), pygame.mouse.get_pos())
-        self._text(surface, "ESC — выход", self.small_font, self.MUTED,
-                   (left + 24, height - 42))
-
         if self.settings_open:
             self._render_settings(surface)
 

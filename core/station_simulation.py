@@ -44,10 +44,7 @@ class StationSimulation:
         if self.is_peak != was_peak:
             for index in self.passengers:
                 low, high = (35, 75) if self.is_peak else (8, 35)
-                self.passengers[index] = max(
-                    self.passengers[index],
-                    random.randint(low, high),
-                )
+                self.passengers[index] = random.randint(low, high)
 
         self._last_population_update += dt
         if self._last_population_update >= 5.0:

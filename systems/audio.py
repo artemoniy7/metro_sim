@@ -240,10 +240,11 @@ class AudioSystem:
             for station in stations
         ]
 
-    def _is_station_joint(self, joint_index):
-        coordinate = self._joint_positions.get(joint_index)
-        return coordinate is not None and any(
-            start <= coordinate <= end for start, end in self._station_platforms
+    def _is_station_position(self, wheel_contact_position):
+        """Classify the sound by the exact world position where this wheel hits a joint."""
+        return any(
+            start <= wheel_contact_position <= end
+            for start, end in self._station_platforms
         )
 
     def _play_station_joint(self, group, hit, speed, distance_m):
@@ -656,8 +657,10 @@ class AudioSystem:
             for joint_index, coordinate in self._joint_positions.items()
             if previous_world < coordinate <= current_world
         )
-        for joint_index, _ in sorted(crossed, key=lambda item: item[1]):
-            yield joint_index
+        for joint_index, coordinate in sorted(crossed, key=lambda item: item[1]):
+            # Return the physical contact coordinate as well as the joint ID.
+            # Each wheel pair can then choose its sound from its own crossing.
+            yield joint_index, coordinate
 
     def _process_pair(self, pair_key, offsets, previous_position, position,
                       speed, distance_m):
@@ -668,8 +671,8 @@ class AudioSystem:
         previous_second = previous_position + second_offset
         current_second = position + second_offset
 
-        for joint_index in self._crossed_joints(previous_first, current_first):
-            if self._is_station_joint(joint_index) and self._station_joint_groups:
+        for joint_index, contact_position in self._crossed_joints(previous_first, current_first):
+            if self._is_station_position(contact_position) and self._station_joint_groups:
                 # Platform joints exclusively use the station-specific recordings.
                 bag = self._station_joint_bags.get("station")
                 if not bag:
@@ -705,7 +708,7 @@ class AudioSystem:
             self._pair_sequences[(pair_key, joint_index)] = ("regular", group)
             self._play(group, 1, speed, distance_m)
 
-        for joint_index in self._crossed_joints(previous_second, current_second):
+        for joint_index, contact_position in self._crossed_joints(previous_second, current_second):
             sequence = self._pair_sequences.pop((pair_key, joint_index), None)
             if sequence is None:
                 continue

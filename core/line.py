@@ -64,11 +64,11 @@ class Line:
         self.signals.sort(key=lambda signal: signal.position)
 
     def update_signals(self, train, train_speed=None):
-        """Keep each signal red while its protected block is occupied.
+        """Update working signals using every physical signal as a block boundary.
 
-        Blocks are the intervals between consecutive working signals (with the
-        next physical signal acting as the far boundary). A block is released
-        only when the train's rear-most wheel point passes its far boundary.
+        Passive signals remain dark visually, but still divide the track into
+        short blocks. This prevents a station exit signal from staying red all
+        the way to the next station merely because no working signal lies there.
         """
         trains = list(train) if isinstance(train, (list, tuple)) else [train]
         occupied_ranges = []
@@ -88,13 +88,19 @@ class Line:
             if not signal.operational:
                 signal.set_aspect("dark")
 
-        for index, signal in enumerate(operational):
-            # The next operational signal bounds this signal's protected block.
+        physical_positions = sorted(
+            signal.position for signal in self.signals
+            if signal.position > 0.0
+        )
+
+        for signal in operational:
+            # The next physical signal (including a dark passive signal)
+            # bounds this block, rather than the next station signal.
             block_start = signal.position
-            block_end = (
-                operational[index + 1].position
-                if index + 1 < len(operational)
-                else self.path.total_length
+            block_end = next(
+                (position for position in physical_positions
+                 if position > block_start + 0.01),
+                self.path.total_length,
             )
 
             # Red while any part of the train occupies the block. Never turn

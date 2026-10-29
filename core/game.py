@@ -5,6 +5,7 @@ from core.train import Train
 from core.bot import BotTrain
 from core.camera import Camera
 from core.line import Line
+from core.station_simulation import StationSimulation
 from systems.loader import load_json
 from systems.renderer import Renderer
 from systems.input import InputController
@@ -18,6 +19,7 @@ class Game:
         self.audio = AudioSystem()
         self.line_data = load_json(DATA_DIR / "lines" / "line_1.json", default={})
         self.line = Line(self.line_data)
+        self.station_simulation = StationSimulation(self.line.stations)
         configure_announcements = getattr(self.audio, "configure_station_announcements", None)
         if callable(configure_announcements):
             configure_announcements(len(self.line.stations))
@@ -129,6 +131,10 @@ class Game:
         self.line.update_signals(self.line.traffic_trains)
         self.camera.follow(self.train, self.line.path.total_length)
         self.audio.update(self.train, dt, self.camera)
+        self.station_simulation.update(dt, self.train, self.doors_open)
+        update_station_ambience = getattr(self.audio, "update_station_ambience", None)
+        if callable(update_station_ambience):
+            update_station_ambience(self.station_simulation, self.train)
         update_announcer = getattr(self.audio, "update_station_announcer", None)
         if callable(update_announcer):
             update_announcer(self.train, dt)
@@ -140,6 +146,7 @@ class Game:
             doors_open=self.doors_open,
             door_closing=getattr(self.audio, "door_ring_active", False),
             other_trains=[bot.train for bot in self.bot_trains],
+            station_simulation=self.station_simulation,
         )
         if not self.doors_open and self.renderer.door_open_amount <= 0.0:
             stop_door_ring = getattr(self.audio, "stop_door_ring", None)

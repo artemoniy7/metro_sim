@@ -39,6 +39,10 @@ class AudioSystem:
         self._joint_group_bags = {}
         self._last_joint_group = None
         self._groups = []
+        self._station_joint_sounds = {}
+        self._station_joint_groups = []
+        self._station_joint_bags = {}
+        self._station_platforms = []
         self._loco_image_width = 2048
         self._car_image_width = 2048
         self.rolling_sounds = []
@@ -193,6 +197,25 @@ class AudioSystem:
                 if hit == 1 and (group, 2) in self.sounds
             })
 
+            # Load the dedicated platform-joint recordings, including end variants.
+            station_pattern = re.compile(
+                r"joint_station_(?:end_)?(\d+)_([12])_fade\.wav$",
+                re.IGNORECASE,
+            )
+            for path in sorted(sound_dir.iterdir()):
+                match = station_pattern.fullmatch(path.name)
+                if not match:
+                    continue
+                group, hit = int(match.group(1)), int(match.group(2))
+                try:
+                    self._station_joint_sounds[(group, hit)] = pygame.mixer.Sound(str(path))
+                except (pygame.error, OSError):
+                    continue
+            self._station_joint_groups = sorted({
+                group for group, hit in self._station_joint_sounds
+                if hit == 1 and (group, 2) in self._station_joint_sounds
+            })
+
             loco_path = ASSETS_DIR / "trains" / "81-760" / "81-760-loco.png"
             car_path = ASSETS_DIR / "trains" / "81-760" / "81-760-car.png"
             try:
@@ -206,6 +229,39 @@ class AudioSystem:
         except (pygame.error, OSError):
             # Sound is optional; the simulation should still start without it.
             self.sounds = {}
+
+    def configure_station_joint_sounds(self, stations):
+        """Set platform boundaries where station-specific rail-joint recordings apply."""
+        self._station_platforms = [
+            (
+                float(station.get("position", 0.0)) - float(station.get("length_m", 162.0)) / 2.0,
+                float(station.get("position", 0.0)) + float(station.get("length_m", 162.0)) / 2.0,
+            )
+            for station in stations
+        ]
+
+    def _is_station_joint(self, joint_index):
+        coordinate = self._joint_positions.get(joint_index)
+        return coordinate is not None and any(
+            start <= coordinate <= end for start, end in self._station_platforms
+        )
+
+    def _play_station_joint(self, group, hit, speed, distance_m):
+        sound = self._station_joint_sounds.get((group, hit))
+        if sound is None or speed < 0.5 or distance_m >= self.SOUND_CUTOFF_DISTANCE_M:
+            return
+        speed_volume = max(0.08, min(0.65, 0.55 * speed / self.REFERENCE_SPEED_MPS))
+        distance_volume = 1.0 - max(0.0, distance_m - self.SOUND_FULL_VOLUME_DISTANCE_M) / (
+            self.SOUND_CUTOFF_DISTANCE_M - self.SOUND_FULL_VOLUME_DISTANCE_M
+        )
+        channel = next(
+            (candidate for candidate in self.joint_channels if not candidate.get_busy()),
+            None,
+        )
+        if channel is None:
+            return
+        channel.set_volume(max(0.0, min(0.65, speed_volume * distance_volume)))
+        channel.play(sound)
 
     @staticmethod
     def _make_motor_fallback(base_hz, modulation_hz, brightness=0.5):
@@ -613,8 +669,20 @@ class AudioSystem:
         current_second = position + second_offset
 
         for joint_index in self._crossed_joints(previous_first, current_first):
+            if self._is_station_joint(joint_index) and self._station_joint_groups:
+                # Platform joints exclusively use the station-specific recordings.
+                bag = self._station_joint_bags.get("station")
+                if not bag:
+                    bag = list(self._station_joint_groups)
+                    random.shuffle(bag)
+                    self._station_joint_bags["station"] = bag
+                group = bag.pop()
+                self._pair_sequences[(pair_key, joint_index)] = ("station", group)
+                self._play_station_joint(group, 1, speed, distance_m)
+                continue
+
             if not self._groups:
-                return
+                continue
             speed_kmh = speed * 3.6
             closest_difference = min(
                 abs(self._group_speeds[group] - speed_kmh)
@@ -624,27 +692,27 @@ class AudioSystem:
                 group for group in self._groups
                 if abs(self._group_speeds[group] - speed_kmh) <= closest_difference + 5.0
             ]
-
-            # Draw from a shuffled bag instead of choosing freely on every hit.
-            # This prevents the same few recordings from repeating in a pattern
-            # while still keeping recordings close to the train's current speed.
             bag_key = tuple(candidates)
             bag = self._joint_group_bags.get(bag_key)
             if not bag:
                 bag = list(candidates)
                 random.shuffle(bag)
-                # Avoid an identical recording at the boundary between bags.
                 if len(bag) > 1 and bag[-1] == self._last_joint_group:
                     bag[0], bag[-1] = bag[-1], bag[0]
                 self._joint_group_bags[bag_key] = bag
             group = bag.pop()
             self._last_joint_group = group
-            self._pair_sequences[(pair_key, joint_index)] = group
+            self._pair_sequences[(pair_key, joint_index)] = ("regular", group)
             self._play(group, 1, speed, distance_m)
 
         for joint_index in self._crossed_joints(previous_second, current_second):
-            group = self._pair_sequences.pop((pair_key, joint_index), None)
-            if group is not None:
+            sequence = self._pair_sequences.pop((pair_key, joint_index), None)
+            if sequence is None:
+                continue
+            kind, group = sequence if isinstance(sequence, tuple) else ("regular", sequence)
+            if kind == "station":
+                self._play_station_joint(group, 2, speed, distance_m)
+            else:
                 self._play(group, 2, speed, distance_m)
 
     @staticmethod

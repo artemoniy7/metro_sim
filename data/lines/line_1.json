@@ -1,372 +1,524 @@
 {
-  "name": "Серпуховско-Тимирязевская линия (9, серая)",
-  "line_number": 9,
+  "name": "Сокольническая линия (1, красная)",
+  "line_number": 1,
   "color": [
-    145,
-    148,
-    155
+    214,
+    8,
+    59
   ],
-  "total_length_m": 41470,
-  "station_length_m": 162,
+  "total_length_m": 41245,
+  "total_length_status": "approximate_from_station_coordinates",
+  "station_count": 27,
+  "train_wagons": {
+    "standard": 8,
+    "rusich": 5,
+    "other_known": [
+      7
+    ],
+    "status": "operational_variants"
+  },
+  "train_types": [
+    "81-765/766/767 «Москва»",
+    "81-765.4/766.4/767.4 «Москва-2019»",
+    "81-740.1/741.1 «Русич»",
+    "81-717.5М/714.5М",
+    "81-717.5А/714.5А"
+  ],
+  "depots": [
+    "ТЧ-1 «Северное»",
+    "ТЧ-13 «Черкизово»",
+    "ТЧ-24 «Столбово»"
+  ],
+  "distance_policy": "Позиции перегонов рассчитаны приблизительно по координатам станций; это не точные длины путей. Глубина null означает, что достоверное числовое значение не найдено.",
   "points": [
     [
       0,
-      9
+      -8
     ],
     [
-      2089,
-      9.5
+      1373,
+      -9
     ],
     [
-      4804,
-      9
+      3410,
+      -8
     ],
     [
-      6266,
-      10.5
+      5735,
+      -9
     ],
     [
-      8146,
-      61
+      7017,
+      -8
     ],
     [
-      10025,
-      63.5
+      7888,
+      -8
     ],
     [
-      11488,
-      59
+      8739,
+      -31
     ],
     [
-      13472,
-      52
+      9436,
+      -35
     ],
     [
-      15143,
-      48.5
+      10433,
+      -32.5
     ],
     [
-      16396,
-      50
+      11128,
+      -15
     ],
     [
-      17858,
-      62
+      11978,
+      -12
     ],
     [
-      19529,
-      46.5
+      12740,
+      -13
     ],
     [
-      20886,
-      36.5
+      13973,
+      -10.5
     ],
     [
-      22244,
-      43
+      15360,
+      -42
     ],
     [
-      24124,
-      9.5
+      16354,
+      -42
     ],
     [
-      26421,
-      13.5
+      17835,
+      -10
     ],
     [
-      28197,
-      9
+      20390,
+      -26.5
     ],
     [
-      29763,
-      9.5
+      22798,
+      -8
     ],
     [
-      31121,
-      13
+      24879,
+      -8
     ],
     [
-      33001,
-      10.5
+      26970,
+      -12
     ],
     [
-      34880,
-      10
+      29356,
+      -12
     ],
     [
-      36029,
-      9.5
+      31021,
+      -12
     ],
     [
-      38327,
-      8
+      33528,
+      0
     ],
     [
-      39590,
-      8
+      35890,
+      0
     ],
     [
-      41470,
-      10
+      38413,
+      -12
+    ],
+    [
+      39495,
+      -8
+    ],
+    [
+      41245,
+      0
     ]
   ],
   "stations": [
     {
       "id": "station_01",
-      "name": "Алтуфьево",
+      "name": "Бульвар Рокоссовского",
       "position": 0,
-      "depth_m": 9,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1990-08-01",
+      "latitude": 55.814722,
+      "longitude": 37.734167,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_02",
-      "name": "Бибирево",
-      "position": 2089,
-      "depth_m": 9.5,
+      "name": "Черкизовская",
+      "position": 1373,
+      "depth_m": 9,
+      "depth_status": "published",
+      "construction": "односводчатая мелкого заложения",
+      "opened": "1990-08-01",
+      "latitude": 55.803889,
+      "longitude": 37.744722,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_03",
-      "name": "Отрадное",
-      "position": 4804,
-      "depth_m": 9,
+      "name": "Преображенская площадь",
+      "position": 3410,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1965-12-31",
+      "latitude": 55.796389,
+      "longitude": 37.715,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_04",
-      "name": "Владыкино",
-      "position": 6266,
-      "depth_m": 10.5,
+      "name": "Сокольники",
+      "position": 5735,
+      "depth_m": 9,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.788889,
+      "longitude": 37.680278,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_05",
-      "name": "Петровско-Разумовская",
-      "position": 8146,
-      "depth_m": 61,
+      "name": "Красносельская",
+      "position": 7017,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.78,
+      "longitude": 37.667222,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_06",
-      "name": "Тимирязевская",
-      "position": 10025,
-      "depth_m": 63.5,
+      "name": "Комсомольская",
+      "position": 7888,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.775278,
+      "longitude": 37.656111,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_07",
-      "name": "Дмитровская",
-      "position": 11488,
-      "depth_m": 59,
+      "name": "Красные Ворота",
+      "position": 8739,
+      "depth_m": 31,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.768889,
+      "longitude": 37.648611,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_08",
-      "name": "Савёловская",
-      "position": 13472,
-      "depth_m": 52,
+      "name": "Чистые пруды",
+      "position": 9436,
+      "depth_m": 35,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.765833,
+      "longitude": 37.638889,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_09",
-      "name": "Менделеевская",
-      "position": 15143,
-      "depth_m": 48.5,
+      "name": "Лубянка",
+      "position": 10433,
+      "depth_m": 32.5,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.759722,
+      "longitude": 37.627222,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_10",
-      "name": "Цветной бульвар",
-      "position": 16396,
-      "depth_m": 50,
+      "name": "Охотный Ряд",
+      "position": 11128,
+      "depth_m": 15,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.757778,
+      "longitude": 37.616667,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_11",
-      "name": "Чеховская",
-      "position": 17858,
-      "depth_m": 62,
+      "name": "Библиотека имени Ленина",
+      "position": 11978,
+      "depth_m": 12,
+      "depth_status": "published",
+      "construction": "односводчатая мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.751111,
+      "longitude": 37.61,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_12",
-      "name": "Боровицкая",
-      "position": 19529,
-      "depth_m": 46.5,
+      "name": "Кропоткинская",
+      "position": 12740,
+      "depth_m": 13,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.745278,
+      "longitude": 37.603611,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_13",
-      "name": "Полянка",
-      "position": 20886,
-      "depth_m": 36.5,
+      "name": "Парк культуры",
+      "position": 13973,
+      "depth_m": 10.5,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1935-05-15",
+      "latitude": 55.735556,
+      "longitude": 37.594167,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_14",
-      "name": "Серпуховская",
-      "position": 22244,
-      "depth_m": 43,
+      "name": "Фрунзенская",
+      "position": 15360,
+      "depth_m": 42,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1957-05-01",
+      "latitude": 55.726667,
+      "longitude": 37.578611,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_15",
-      "name": "Тульская",
-      "position": 24124,
-      "depth_m": 9.5,
+      "name": "Спортивная",
+      "position": 16354,
+      "depth_m": 42,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1957-05-01",
+      "latitude": 55.723333,
+      "longitude": 37.563889,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_16",
-      "name": "Нагатинская",
-      "position": 26421,
-      "depth_m": 13.5,
+      "name": "Воробьёвы горы",
+      "position": 17835,
+      "depth_m": 10,
+      "depth_status": "published",
+      "construction": "эстакадная крытая",
+      "opened": "1959-01-12",
+      "latitude": 55.710278,
+      "longitude": 37.559167,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_17",
-      "name": "Нагорная",
-      "position": 28197,
-      "depth_m": 9,
+      "name": "Университет",
+      "position": 20390,
+      "depth_m": 26.5,
+      "depth_status": "published",
+      "construction": "пилонная глубокого заложения",
+      "opened": "1959-01-12",
+      "latitude": 55.6925,
+      "longitude": 37.533333,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_18",
-      "name": "Нахимовский проспект",
-      "position": 29763,
-      "depth_m": 9.5,
+      "name": "Проспект Вернадского",
+      "position": 22798,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1963-12-30",
+      "latitude": 55.677222,
+      "longitude": 37.506111,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_19",
-      "name": "Севастопольская",
-      "position": 31121,
-      "depth_m": 13,
+      "name": "Юго-Западная",
+      "position": 24879,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "1963-12-30",
+      "latitude": 55.663611,
+      "longitude": 37.483333,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_20",
-      "name": "Чертановская",
-      "position": 33001,
-      "depth_m": 10.5,
+      "name": "Тропарёво",
+      "position": 26970,
+      "depth_m": 12,
+      "depth_status": "published",
+      "construction": "односводчатая мелкого заложения",
+      "opened": "2014-12-08",
+      "latitude": 55.645833,
+      "longitude": 37.4725,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_21",
-      "name": "Южная",
-      "position": 34880,
-      "depth_m": 10,
+      "name": "Румянцево",
+      "position": 29356,
+      "depth_m": 12,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "2016-01-18",
+      "latitude": 55.633056,
+      "longitude": 37.441944,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_22",
-      "name": "Пражская",
-      "position": 36029,
-      "depth_m": 9.5,
+      "name": "Саларьево",
+      "position": 31021,
+      "depth_m": 12,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "2016-02-15",
+      "latitude": 55.621944,
+      "longitude": 37.424167,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_23",
-      "name": "Улица Академика Янгеля",
-      "position": 38327,
-      "depth_m": 8,
+      "name": "Филатов Луг",
+      "position": 33528,
+      "depth_m": 0,
+      "depth_status": "published",
+      "construction": "наземная крытая",
+      "opened": "2019-06-20",
+      "latitude": 55.601389,
+      "longitude": 37.407778,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_24",
-      "name": "Аннино",
-      "position": 39590,
-      "depth_m": 8,
+      "name": "Прокшино",
+      "position": 35890,
+      "depth_m": 0,
+      "depth_status": "published",
+      "construction": "наземная крытая",
+      "opened": "2019-06-20",
+      "latitude": 55.586111,
+      "longitude": 37.433889,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     },
     {
       "id": "station_25",
-      "name": "Бульвар Дмитрия Донского",
-      "position": 41470,
-      "depth_m": 10,
+      "name": "Ольховая",
+      "position": 38413,
+      "depth_m": 12,
+      "depth_status": "published",
+      "construction": "однопролётная мелкого заложения",
+      "opened": "2019-06-20",
+      "latitude": 55.568611,
+      "longitude": 37.459444,
       "length_m": 162,
-      "dwell_seconds": 20
+      "dwell_seconds": 20,
+      "position_status": "approximate"
+    },
+    {
+      "id": "station_26",
+      "name": "Новомосковская",
+      "position": 39495,
+      "depth_m": 8,
+      "depth_status": "published",
+      "construction": "колонная мелкого заложения",
+      "opened": "2019-06-20",
+      "latitude": 55.560278,
+      "longitude": 37.468333,
+      "length_m": 162,
+      "dwell_seconds": 20,
+      "position_status": "approximate"
+    },
+    {
+      "id": "station_27",
+      "name": "Потапово",
+      "position": 41245,
+      "depth_m": 0,
+      "depth_status": "published",
+      "construction": "наземная крытая",
+      "opened": "2024-09-05",
+      "latitude": 55.553056,
+      "longitude": 37.493056,
+      "length_m": 162,
+      "dwell_seconds": 20,
+      "position_status": "approximate"
     }
   ],
-  "signals": [
-    {
-      "name": "S1",
-      "position": 700,
-      "aspect": "green"
-    },
-    {
-      "name": "S2",
-      "position": 3500,
-      "aspect": "green"
-    },
-    {
-      "name": "S3",
-      "position": 7000,
-      "aspect": "green"
-    },
-    {
-      "name": "S4",
-      "position": 11000,
-      "aspect": "green"
-    },
-    {
-      "name": "S5",
-      "position": 15000,
-      "aspect": "yellow"
-    },
-    {
-      "name": "S6",
-      "position": 19000,
-      "aspect": "green"
-    },
-    {
-      "name": "S7",
-      "position": 23000,
-      "aspect": "green"
-    },
-    {
-      "name": "S8",
-      "position": 27000,
-      "aspect": "green"
-    },
-    {
-      "name": "S9",
-      "position": 31000,
-      "aspect": "green"
-    },
-    {
-      "name": "S10",
-      "position": 35000,
-      "aspect": "green"
-    },
-    {
-      "name": "S11",
-      "position": 39000,
-      "aspect": "green"
-    }
-  ]
+  "signals": []
 }

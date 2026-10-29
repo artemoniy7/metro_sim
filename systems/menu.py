@@ -252,7 +252,7 @@ class MainMenu:
                    self.small, self.MUTED, (map_rect.x+10, map_rect.bottom+7))
         self._text(surface, "3. Выбери поезд", self.body, self.MUTED, (int(w*.055), 505))
         train_y = 535
-        train_w = min(270, int(w*.22))
+        train_w = min(230, int(w*.19))
         for i, (train_path, train) in enumerate(self.train_options):
             x = int(w*.055) + i * (train_w + 16)
             rect = pygame.Rect(x, train_y, train_w, 112)

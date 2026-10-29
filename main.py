@@ -6,7 +6,7 @@ from systems.menu import MainMenu
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode(WINDOW_SIZE)
+    screen = pygame.display.set_mode(WINDOW_SIZE, pygame.NOFRAME)
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
     menu = MainMenu(WINDOW_SIZE)

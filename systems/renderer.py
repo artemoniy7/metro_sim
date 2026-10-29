@@ -36,7 +36,17 @@ class Renderer:
                         (cx, cy, cw, ch)
                     ).copy()
         self.signal_glow_cache = {}
-        self.station_image = self._load_sprite(ASSETS_DIR / "stations" / "line_9" / "altufyevo.png")
+        station_dir = ASSETS_DIR / "stations" / "line_9"
+        legacy_station_image = self._load_sprite(station_dir / "altufyevo.png")
+        self.station_images = {}
+        # Station textures are numbered by their order on line 9:
+        # st_01.png, st_02.png, ... Missing files use the legacy texture.
+        for station_number in range(1, 100):
+            texture_path = station_dir / f"st_{station_number:02d}.png"
+            texture = self._load_sprite(texture_path)
+            if texture is not None:
+                self.station_images[station_number - 1] = texture
+        self.legacy_station_image = legacy_station_image
         self.vehicle_angles = {}
         self._station_tile_cache = {}
         self.last_render_time = None
@@ -225,28 +235,50 @@ class Renderer:
                 world_x = camera_x + sx / scale
                 route_position = line.path.total_length - world_x
                 track_y = rail_y_at(sx)
-                at_station = any(abs(route_position - float(station.get("position", 0)))
-                                 <= float(station.get("length_m", 162)) / 2 for station in line.stations)
-                if at_station:
+                station_index = next((
+                    index for index, station in enumerate(line.stations)
+                    if abs(route_position - float(station.get("position", 0)))
+                    <= float(station.get("length_m", 162)) / 2
+                ), None)
+                if station_index is not None:
                     station_height = max(1, round(8.5 * scale))
                     station_bottom_extra = max(1, round(0.25 * scale))
-                    if self.station_image is not None:
-                        station_width = max(1, round(station_height * self.station_image.get_width() / self.station_image.get_height()))
-                        station_key = (id(self.station_image), station_width, station_height)
+                    station_texture = self.station_images.get(
+                        station_index, self.legacy_station_image
+                    )
+                    if station_texture is not None:
+                        station_width = max(1, round(
+                            station_height * station_texture.get_width()
+                            / station_texture.get_height()
+                        ))
+                        station_key = (id(station_texture), station_width, station_height)
                         if station_key not in self._station_tile_cache:
-                            self._station_tile_cache = {station_key: pygame.transform.smoothscale(self.station_image, (station_width, station_height))}
+                            self._station_tile_cache = {
+                                station_key: pygame.transform.smoothscale(
+                                    station_texture, (station_width, station_height)
+                                )
+                            }
                         station_tile = self._station_tile_cache[station_key]
                         tile_world_width = station_width / scale
                         tile_x = int(((world_x % tile_world_width) / tile_world_width) * station_width)
                         src_x = min(station_width - 1, max(0, tile_x))
                         slice_width = min(strip_width, station_width - src_x)
                         if slice_width > 0:
-                            surface.blit(station_tile.subsurface((src_x, 0, slice_width, station_height)), (sx, track_y - station_height + station_bottom_extra))
+                            surface.blit(
+                                station_tile.subsurface((src_x, 0, slice_width, station_height)),
+                                (sx, track_y - station_height + station_bottom_extra)
+                            )
                         if slice_width < strip_width:
                             extra_width = min(strip_width - slice_width, station_width)
-                            surface.blit(station_tile.subsurface((0, 0, extra_width, station_height)), (sx + slice_width, track_y - station_height + station_bottom_extra))
+                            surface.blit(
+                                station_tile.subsurface((0, 0, extra_width, station_height)),
+                                (sx + slice_width, track_y - station_height + station_bottom_extra)
+                            )
                     else:
-                        pygame.draw.rect(surface, (142, 24, 34), (sx, track_y - station_height, strip_width, station_height + 20))
+                        pygame.draw.rect(
+                            surface, (142, 24, 34),
+                            (sx, track_y - station_height, strip_width, station_height + 20)
+                        )
                 else:
                     src_x = int((world_x * scale) % tunnel_width)
                     src_x = min(tunnel_width - 1, max(0, src_x))

@@ -67,6 +67,9 @@ class AudioSystem:
         self.station_announcer_pending_start = False
         self.station_announcement_channel = None
         self._last_manual_current_station = None
+        self.station_ambience_sounds = {}
+        self.station_ambience_channel = None
+        self._active_station_ambience = None
         self.brake_channel = None
         self.brake_channel_alt = None
         self._active_brake_channel = 0
@@ -109,7 +112,7 @@ class AudioSystem:
 
             # Give each sound category its own channels. Track-joint sounds
             # must never steal a channel from the motor, brakes, or announcements.
-            pygame.mixer.set_num_channels(max(32, pygame.mixer.get_num_channels()))
+            pygame.mixer.set_num_channels(max(33, pygame.mixer.get_num_channels()))
             pygame.mixer.set_reserved(13)
             self.rolling_channels = [pygame.mixer.Channel(i) for i in range(3)]
             self.engine_channels = [pygame.mixer.Channel(i) for i in range(3, 6)]
@@ -122,6 +125,19 @@ class AudioSystem:
             self.overspeed_ring_channel = pygame.mixer.Channel(11)
             self.door_channel = pygame.mixer.Channel(12)
             self.joint_channels = [pygame.mixer.Channel(i) for i in range(13, 32)]
+            self.station_ambience_channel = pygame.mixer.Channel(32)
+            station_sound_dir = ASSETS_DIR / "sounds" / "station"
+            for crowd, filename in (
+                ("empty", "station_ambience_empty_01.wav"),
+                ("low", "station_ambience_low_01.wav"),
+                ("medium", "station_ambience_med_01.wav"),
+            ):
+                try:
+                    self.station_ambience_sounds[crowd] = pygame.mixer.Sound(
+                        str(station_sound_dir / filename)
+                    )
+                except (pygame.error, OSError):
+                    continue
 
             # Short squeals are used when braking starts; the longer recordings
             # are reserved for the final few km/h before the train stops.
@@ -234,6 +250,49 @@ class AudioSystem:
             self.door_channel.stop()
             self.door_channel.set_volume(max(0.0, min(1.0, volume)))
             self.door_channel.play(self.door_sound)
+
+    def update_station_ambience(self, station_simulation, train):
+        """Loop station ambience with crowd-dependent clips and distance falloff."""
+        channel = self.station_ambience_channel
+        if channel is None or not self.station_ambience_sounds:
+            return
+
+        station_index, station, distance = station_simulation.nearest_station(train.position)
+        if station is None:
+            channel.stop()
+            self._active_station_ambience = None
+            return
+
+        # Full level across the whole platform; fade outside it, silent 420 m away.
+        if distance <= 20.0:
+            distance_volume = 1.0
+        else:
+            distance_volume = max(0.0, min(1.0, (420.0 - distance) / 400.0))
+        if distance_volume <= 0.01:
+            if channel.get_busy():
+                channel.stop()
+            self._active_station_ambience = None
+            return
+
+        count = station_simulation.passengers.get(station_index, 0)
+        if count < 20:
+            crowd = "empty"
+        elif count < 65:
+            crowd = "low"
+        else:
+            crowd = "medium"
+        sound = self.station_ambience_sounds.get(crowd)
+        if sound is None:
+            sound = self.station_ambience_sounds.get("low") or next(
+                iter(self.station_ambience_sounds.values()), None
+            )
+        if sound is None:
+            return
+        if self._active_station_ambience != crowd or not channel.get_busy():
+            channel.stop()
+            channel.play(sound, loops=-1)
+            self._active_station_ambience = crowd
+        channel.set_volume(0.42 * distance_volume)
 
     def configure_station_announcements(self, station_count):
         """Load station-specific next/current announcement clips."""

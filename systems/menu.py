@@ -16,6 +16,10 @@ class MainMenu:
         self.width, self.height = size
         self.settings_open = False
         self.buttons = {}
+        self.hover_progress = {"start": 0.0, "settings": 0.0, "quit": 0.0}
+        self.pending_action = None
+        self.click_progress = 0.0
+        self.completed_action = None
         # Use the bundled IBM Plex Sans family, with a system-font fallback.
         font_dir = Path(__file__).resolve().parent.parent / "assets" / "ui" / "fonts"
         self.title_font = self._load_font(font_dir / "IBMPlexSans-Bold.ttf", 58, bold=True)
@@ -34,14 +38,16 @@ class MainMenu:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.settings_open:
                 if self.buttons.get("back", pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
-                    self.settings_open = False
+                    self.pending_action = "back"
+                    self.click_progress = 0.0
                 return None
-            if self.buttons.get("start", pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
-                return "start"
-            if self.buttons.get("settings", pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
-                self.settings_open = True
-            if self.buttons.get("quit", pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
-                return "quit"
+            if self.pending_action is not None:
+                return None
+            for key in ("start", "settings", "quit"):
+                if self.buttons.get(key, pygame.Rect(0, 0, 0, 0)).collidepoint(event.pos):
+                    self.pending_action = key
+                    self.click_progress = 0.0
+                    break
         return None
 
     @staticmethod
@@ -52,27 +58,79 @@ class MainMenu:
             return pygame.font.SysFont("arial", size, bold=bold)
 
     def update(self, dt):
-        """Keep the menu interface compatible with the main game loop."""
-        pass
+        """Animate the little train and return an action after its departure."""
+        mouse_pos = pygame.mouse.get_pos()
+        for key in self.hover_progress:
+            rect = self.buttons.get(key)
+            target = 1.0 if rect and rect.collidepoint(mouse_pos) and self.pending_action is None else 0.0
+            step = min(1.0, dt * 7.0)
+            if self.hover_progress[key] < target:
+                self.hover_progress[key] = min(target, self.hover_progress[key] + step)
+            else:
+                self.hover_progress[key] = max(target, self.hover_progress[key] - step)
+
+        if self.pending_action is not None:
+            self.click_progress = min(1.0, self.click_progress + dt / 0.32)
+            if self.click_progress >= 1.0:
+                action = self.pending_action
+                self.pending_action = None
+                self.completed_action = action
+                if action == "settings":
+                    self.settings_open = True
+                elif action == "back":
+                    self.settings_open = False
+                elif action in ("start", "quit"):
+                    return action
+        return None
 
     @staticmethod
     def _text(surface, text, font, color, position):
         surface.blit(font.render(text, True, color), position)
 
+    def _draw_train(self, surface, x, center_y, progress=1.0):
+        """Draw a tiny, original metro carriage using simple Pygame shapes."""
+        w, h = 39, 22
+        body = pygame.Rect(int(x), int(center_y - h / 2), w, h)
+        pygame.draw.rect(surface, (235, 238, 242), body, border_radius=5)
+        pygame.draw.rect(surface, self.ACCENT, (body.x + 2, body.y + 3, w - 4, 4), border_radius=2)
+        for i in range(3):
+            pygame.draw.rect(surface, (58, 76, 91), (body.x + 5 + i * 9, body.y + 9, 7, 6), border_radius=1)
+        pygame.draw.circle(surface, (15, 19, 25), (body.x + 9, body.bottom - 1), 3)
+        pygame.draw.circle(surface, (15, 19, 25), (body.right - 9, body.bottom - 1), 3)
+
     def _button(self, surface, key, label, rect, mouse_pos, primary=False):
         self.buttons[key] = rect
         hovered = rect.collidepoint(mouse_pos)
+        hover = self.hover_progress.get(key, 0.0)
+        leaving = self.pending_action == key
+        click = self.click_progress if leaving else 0.0
+        scale = 1.0 + 0.025 * hover + 0.045 * click
+        draw_rect = rect.copy()
+        draw_rect.width = int(rect.width * scale)
+        draw_rect.height = int(rect.height * scale)
+        draw_rect.center = (rect.centerx + int(5 * hover), rect.centery)
+        if leaving:
+            draw_rect.centerx += int(70 * click)
         color = self.ACCENT if primary else (self.PANEL_HOVER if hovered else self.PANEL)
         if primary and hovered:
             color = (239, 62, 72)
-        pygame.draw.rect(surface, color, rect, border_radius=8)
+        pygame.draw.rect(surface, color, draw_rect, border_radius=8)
         if not primary:
-            pygame.draw.rect(surface, self.LINE, rect, 1, border_radius=8)
+            pygame.draw.rect(surface, self.LINE, draw_rect, 1, border_radius=8)
+
+        # The train glides in from the left on hover and departs to the right on click.
+        if leaving:
+            train_x = draw_rect.x + 18 + int((draw_rect.width - 5) * click)
+            self._draw_train(surface, train_x, draw_rect.centery)
+        elif hover > 0.02:
+            train_x = draw_rect.x - 45 + int(hover * 52)
+            self._draw_train(surface, train_x, draw_rect.centery)
         text = self.button_font.render(label, True, self.TEXT)
-        surface.blit(text, text.get_rect(midleft=(rect.x + 22, rect.centery)))
+        text_rect = text.get_rect(midleft=(draw_rect.x + 22, draw_rect.centery))
+        surface.blit(text, text_rect)
         if primary:
             arrow = self.button_font.render("→", True, self.TEXT)
-            surface.blit(arrow, arrow.get_rect(midright=(rect.right - 20, rect.centery)))
+            surface.blit(arrow, arrow.get_rect(midright=(draw_rect.right - 20, draw_rect.centery)))
 
     def render(self, surface):
         width, height = surface.get_size()

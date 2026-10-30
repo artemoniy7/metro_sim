@@ -19,8 +19,14 @@ class Game:
         self.audio = AudioSystem()
         line_path = DATA_DIR / "lines" / (line_file or "line_9.json")
         self.line_data = load_json(line_path, default={})
-        self.line = Line(self.line_data)
         line_id = self.line_data.get("line_id", f"line_{self.line_data.get('line_number', 9)}")
+        # For Line 9, build one continuous playable route beginning at the
+        # Vladykino depot lead and joining the line at Vladykino station.
+        self.depot_mode = (line_id == "line_9" and float(start_position) <= 0.01)
+        self.depot_length = 720.0
+        if self.depot_mode:
+            self.line_data = self._make_depot_departure_route(self.line_data, self.depot_length)
+        self.line = Line(self.line_data)
         self.renderer.configure_line_station_sprites(line_id)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):
@@ -33,14 +39,7 @@ class Game:
         train_data = load_json(train_path, default={})
         self.train = Train(train_data)
         self.line_max_speed = self.train.max_speed
-        self.depot_mode = (line_id == "line_9" and float(start_position) <= 0.01)
         self.depot_route_set = False
-        self.depot_length = 720.0
-        self.depot_line = Line({
-            "name": "ТЧ-14 «Владыкино» — маневровый путь",
-            "points": [[0, 300], [180, 300], [360, 300], [540, 300], [720, 300]],
-            "stations": [],
-        })
         self.train.position = 0.0 if self.depot_mode else max(0.0, float(start_position))
         if self.depot_mode:
             self.train.max_speed = min(self.line_max_speed, 15.0 / 3.6)
@@ -61,6 +60,50 @@ class Game:
         # AI traffic is enabled only when starting from the line origin.
         if self.train.position <= 0.01 and not self.depot_mode:
             self._dispatch_bot()
+
+    @staticmethod
+    def _make_depot_departure_route(line_data, depot_length):
+        """Join the depot lead to the southbound Line 9 route at Vladykino.
+
+        The source route positions before Vladykino are intentionally omitted:
+        this scenario starts at the depot and drives south from Vladykino.
+        """
+        stations = list(line_data.get("stations", []))
+        connection = next(
+            (station for station in stations
+             if "Владыкино" in str(station.get("name", ""))),
+            None,
+        )
+        if connection is None:
+            return line_data
+        connection_position = float(connection.get("position", 6266.0))
+        points = list(line_data.get("points", []))
+        # Keep the profile from the Vladykino point onward, while inserting
+        # a 720 m surface lead before it. The x-axis is the route distance.
+        connection_point = next(
+            (point for point in points if abs(float(point[0]) - connection_position) < 1.0),
+            [connection_position, float(connection.get("depth_m", 10.5))],
+        )
+        base_y = float(connection_point[1])
+        route_points = [[0.0, base_y], [float(depot_length), base_y]]
+        for point in points:
+            if float(point[0]) > connection_position + 0.5:
+                route_points.append([
+                    float(depot_length) + float(point[0]) - connection_position,
+                    float(point[1]),
+                ])
+        shifted_stations = []
+        for station in stations:
+            position = float(station.get("position", 0.0))
+            if position >= connection_position - 0.5:
+                shifted = dict(station)
+                shifted["position"] = float(depot_length) + position - connection_position
+                shifted_stations.append(shifted)
+        result = dict(line_data)
+        result["points"] = route_points
+        result["stations"] = shifted_stations
+        result["name"] = str(line_data.get("name", "Линия 9")) + " — выезд из ТЧ-14"
+        return result
 
     def _dispatch_bot(self):
         train_data = load_json(DATA_DIR / "trains" / "81-760.json", default={})
@@ -119,30 +162,19 @@ class Game:
         self.train.doors_open = self.doors_open
 
         if self.depot_mode:
-            # The blue shunting aspect holds the train until the driver sets a route.
+            # Closed shunting signal blocks traction. Once opened, the same
+            # train runs on the same continuous route used by the line renderer.
             if not self.depot_route_set and self.train.controller_notch > 0:
                 self.train.controller_notch = 0
-            self.depot_line.traffic_trains = [self.train]
-            self.train.update(dt, self.depot_line)
-            if self.train.position >= self.depot_length - 0.5:
+            self.line.traffic_trains = [self.train]
+            self.train.update(dt, self.line)
+            if self.train.position >= self.depot_length:
                 self.depot_mode = False
-                station_position = next(
-                    (float(station.get("position", 0.0))
-                     for station in self.line.stations
-                     if "Владыкино" in str(station.get("name", ""))),
-                    6266.0,
-                )
-                self.train.position = station_position
-                self.train.speed = 0.0
-                self.train.acceleration_state = 0.0
-                self.train.controller_notch = 0
                 self.train.max_speed = self.line_max_speed
                 self.bots_enabled = True
                 self.bot_dispatch_timer = 0.0
-            self.camera.follow(
-                self.train,
-                self.depot_length if self.depot_mode else self.line.path.total_length,
-            )
+                self.train.als.speed_limit(self.line, self.train.position, self.train.max_speed)
+            self.camera.follow(self.train, self.line.path.total_length)
             self.audio.update(self.train, dt, self.camera)
             return
 

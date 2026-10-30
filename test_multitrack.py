@@ -111,9 +111,9 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif event.key == pygame.K_a:
+                elif event.key == pygame.K_a and distance < 610:
                     active_route = 0
-                elif event.key == pygame.K_d:
+                elif event.key == pygame.K_d and distance < 610:
                     active_route = 1
                 elif event.key == pygame.K_SPACE:
                     paused = not paused

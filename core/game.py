@@ -32,7 +32,18 @@ class Game:
         train_path = DATA_DIR / "trains" / (train_file or "81-760.json")
         train_data = load_json(train_path, default={})
         self.train = Train(train_data)
-        self.train.position = max(0.0, float(start_position))
+        self.line_max_speed = self.train.max_speed
+        self.depot_mode = (line_id == "line_9" and float(start_position) <= 0.01)
+        self.depot_route_set = False
+        self.depot_length = 720.0
+        self.depot_line = Line({
+            "name": "ТЧ-14 «Владыкино» — маневровый путь",
+            "points": [[0, 300], [180, 300], [360, 300], [540, 300], [720, 300]],
+            "stations": [],
+        })
+        self.train.position = 0.0 if self.depot_mode else max(0.0, float(start_position))
+        if self.depot_mode:
+            self.train.max_speed = min(self.line_max_speed, 15.0 / 3.6)
         self.end_position = float(end_position) if end_position is not None else self.line.path.total_length
         # Close view of the locomotive, with mouse-wheel zoom and consist panning.
         self.camera = Camera(WINDOW_SIZE, zoom=2.8)
@@ -48,7 +59,7 @@ class Game:
         # Put the first AI train into service immediately; subsequent trains
         # are dispatched every two minutes.
         # AI traffic is enabled only when starting from the line origin.
-        if self.train.position <= 0.01:
+        if self.train.position <= 0.01 and not self.depot_mode:
             self._dispatch_bot()
 
     def _dispatch_bot(self):
@@ -70,7 +81,10 @@ class Game:
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_v:
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.depot_mode:
+            self.depot_route_set = not self.depot_route_set
+            self.train.controller_notch = 0
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_v and not self.depot_mode:
             # Doors may only be operated while the train is completely stopped.
             if abs(self.train.speed) < 0.05:
                 self.doors_open = not self.doors_open
@@ -78,7 +92,7 @@ class Game:
                 play_door_sound = getattr(self.audio, "play_door_sound", None)
                 if callable(play_door_sound):
                     play_door_sound()
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_i and not self.depot_mode:
             toggle_announcer = getattr(self.audio, "toggle_station_announcer", None)
             if callable(toggle_announcer):
                 toggle_announcer(self.train, self.line)
@@ -103,6 +117,34 @@ class Game:
         if self.doors_open and self.train.controller_notch > 0:
             self.train.controller_notch = 0
         self.train.doors_open = self.doors_open
+
+        if self.depot_mode:
+            # The blue shunting aspect holds the train until the driver sets a route.
+            if not self.depot_route_set and self.train.controller_notch > 0:
+                self.train.controller_notch = 0
+            self.depot_line.traffic_trains = [self.train]
+            self.train.update(dt, self.depot_line)
+            if self.train.position >= self.depot_length - 0.5:
+                self.depot_mode = False
+                station_position = next(
+                    (float(station.get("position", 0.0))
+                     for station in self.line.stations
+                     if "Владыкино" in str(station.get("name", ""))),
+                    6266.0,
+                )
+                self.train.position = station_position
+                self.train.speed = 0.0
+                self.train.acceleration_state = 0.0
+                self.train.controller_notch = 0
+                self.train.max_speed = self.line_max_speed
+                self.bots_enabled = True
+                self.bot_dispatch_timer = 0.0
+            self.camera.follow(
+                self.train,
+                self.depot_length if self.depot_mode else self.line.path.total_length,
+            )
+            self.audio.update(self.train, dt, self.camera)
+            return
 
         self.bot_dispatch_timer += dt
         if self.bots_enabled and self.bot_dispatch_timer >= self.bot_dispatch_interval:
@@ -157,6 +199,10 @@ class Game:
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)
+        if self.depot_mode:
+            from systems.depot_view import draw_depot
+            draw_depot(surface, self.train, self.depot_route_set, self.elapsed)
+            return
         self.renderer.draw_scene(
             surface, self.line, self.train, self.camera, self.elapsed,
             doors_open=self.doors_open,

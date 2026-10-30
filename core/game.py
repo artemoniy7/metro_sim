@@ -21,10 +21,7 @@ class Game:
         self.line_data = load_json(line_path, default={})
         line_id = self.line_data.get("line_id", f"line_{self.line_data.get('line_number', 9)}")
         # Start directly on the selected line, at the selected station.
-        # Depot mode is disabled until it is implemented separately.
-        self.depot_mode = False
         self.line = Line(self.line_data)
-        self.line.depot_length = 0.0
         self.renderer.configure_line_station_sprites(line_id)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):
@@ -55,7 +52,7 @@ class Game:
         # Put the first AI train into service immediately; subsequent trains
         # are dispatched every two minutes.
         # AI traffic is enabled only when starting from the line origin.
-        if self.train.position <= 0.01 and not self.depot_mode:
+        if self.train.position <= 0.01:
             self._dispatch_bot()
 
     def _dispatch_bot(self):

@@ -1,0 +1,1 @@
+{"stations":[{"id":"station_1","name":"Парк","line":1,"position":[300,350],"dwell_seconds":20},{"id":"station_2","name":"Центральная","line":1,"position":[900,350],"dwell_seconds":25},{"id":"station_3","name":"Депо","line":1,"position":[1550,350],"dwell_seconds":20}]}

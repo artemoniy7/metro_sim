@@ -1,0 +1,13 @@
+{
+  "id": "tc14_vladykino",
+  "name": "ТЧ-14 «Владыкино»",
+  "line_id": "line_9",
+  "status": "provisional_gameplay_layout",
+  "notes": "Условная игровая схема; геометрия не является точной копией реального депо.",
+  "yard_tracks": 3,
+  "shunting_speed_limit_kmh": 15,
+  "lead_length_m": 720,
+  "connection_station": "Владыкино",
+  "connection_station_position_m": 6266,
+  "shunting_signal": {"name": "М1", "closed_aspect": "blue", "route_set_aspect": "white", "route_key": "R"}
+}

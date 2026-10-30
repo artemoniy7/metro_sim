@@ -20,13 +20,15 @@ class Game:
         line_path = DATA_DIR / "lines" / (line_file or "line_9.json")
         self.line_data = load_json(line_path, default={})
         self.line = Line(self.line_data)
+        line_id = self.line_data.get("line_id", f"line_{self.line_data.get('line_number', 9)}")
+        self.renderer.configure_line_station_sprites(line_id)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):
             configure_station_joints(self.line.stations)
         self.station_simulation = StationSimulation(self.line.stations)
         configure_announcements = getattr(self.audio, "configure_station_announcements", None)
         if callable(configure_announcements):
-            configure_announcements(len(self.line.stations))
+            configure_announcements(len(self.line.stations), line_id)
         train_path = DATA_DIR / "trains" / (train_file or "81-760.json")
         train_data = load_json(train_path, default={})
         self.train = Train(train_data)

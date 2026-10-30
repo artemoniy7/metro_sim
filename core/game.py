@@ -201,7 +201,7 @@ class Game:
         surface.fill(BACKGROUND_COLOR)
         if self.depot_mode:
             from systems.depot_view import draw_depot
-            draw_depot(surface, self.train, self.depot_route_set, self.elapsed)
+            draw_depot(surface, self.train, self.depot_route_set, self.elapsed, self.renderer)
             return
         self.renderer.draw_scene(
             surface, self.line, self.train, self.camera, self.elapsed,

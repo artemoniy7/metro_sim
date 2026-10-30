@@ -351,14 +351,14 @@ class AudioSystem:
             self._active_station_ambience = crowd
         channel.set_volume(0.42 * distance_volume)
 
-    def configure_station_announcements(self, station_count):
+    def configure_station_announcements(self, station_count, line_id="line_9"):
         """Load station-specific next/current announcement clips."""
         self.station_announcements = []
         self.station_announcement_sounds = {}
         if pygame.mixer.get_init() is None:
             return
 
-        station_dir = ASSETS_DIR / "stations" / "line_9"
+        station_dir = ASSETS_DIR / "stations" / str(line_id)
         for station_number in range(2, int(station_count) + 1):
             self.station_announcement_sounds[station_number] = {}
             for kind, suffix in (("next", "next"), ("current", "cur")):

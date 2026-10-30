@@ -36,21 +36,28 @@ class Renderer:
                         (cx, cy, cw, ch)
                     ).copy()
         self.signal_glow_cache = {}
-        station_dir = ASSETS_DIR / "stations" / "line_9"
-        legacy_station_image = self._load_sprite(station_dir / "altufyevo.png")
         self.station_images = {}
-        # Station textures are numbered by their order on line 9:
-        # st_01.png, st_02.png, ... Missing files use the legacy texture.
-        for station_number in range(1, 100):
-            texture_path = station_dir / f"st_{station_number:02d}.png"
-            texture = self._load_sprite(texture_path)
-            if texture is not None:
-                self.station_images[station_number - 1] = texture
-        self.legacy_station_image = legacy_station_image
+        self.legacy_station_image = None
+        self._station_asset_line_id = None
         self.vehicle_angles = {}
         self._station_tile_cache = {}
         self.last_render_time = None
         self._tunnel_tile_cache = {}
+
+    def configure_line_station_sprites(self, line_id):
+        """Load station textures only from the selected line's asset folder."""
+        line_id = str(line_id or "")
+        if line_id == self._station_asset_line_id:
+            return
+        self._station_asset_line_id = line_id
+        station_dir = ASSETS_DIR / "stations" / line_id
+        self.station_images = {}
+        self.legacy_station_image = self._load_sprite(station_dir / "altufyevo.png")
+        for station_number in range(1, 100):
+            texture = self._load_sprite(station_dir / f"st_{station_number:02d}.png")
+            if texture is not None:
+                self.station_images[station_number - 1] = texture
+        self._station_tile_cache.clear()
 
     @staticmethod
     def _load_sprite(path):

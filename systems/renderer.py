@@ -232,7 +232,7 @@ class Renderer:
         depot_length = float(getattr(line, "depot_length", 0.0))
         ground_y = int(height * 0.58)
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
-        if depot_mode:
+        if depot_length > 0.0:
             # Surface depot scenery is drawn in world coordinates; it scrolls
             # under the exact same camera as the tunnel and station platforms.
             pygame.draw.rect(surface, (112, 164, 194), (0, 0, width, ground_y))
@@ -269,7 +269,7 @@ class Renderer:
                     if abs(route_position - float(station.get("position", 0)))
                     <= float(station.get("length_m", 162)) / 2
                 ), None)
-                if depot_mode and route_position < depot_length:
+                if depot_length > 0.0 and route_position < depot_length:
                     pygame.draw.rect(surface, (112, 164, 194), (sx, 0, strip_width, ground_y))
                     pygame.draw.rect(surface, (79, 101, 70),
                                      (sx, ground_y, strip_width, max(1, track_y - ground_y)))
@@ -326,7 +326,7 @@ class Renderer:
         else:
             for sx in range(0, width, 4):
                 route_position = line.path.total_length - (camera_x + sx / scale)
-                if depot_mode and route_position < depot_length:
+                if depot_length > 0.0 and route_position < depot_length:
                     track_y = rail_y_at(sx)
                     pygame.draw.rect(surface, (112, 164, 194), (sx, 0, 4, ground_y))
                     pygame.draw.rect(surface, (79, 101, 70), (sx, ground_y, 4, max(1, track_y-ground_y)))

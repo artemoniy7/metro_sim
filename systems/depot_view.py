@@ -81,7 +81,7 @@ def draw_depot(surface, train, route_set, elapsed, renderer=None):
     _draw_track(surface, rail_y, 0, width)
 
     # Tunnel mouth is cut only into the earth, beginning exactly at ground_y.
-    portal_x = int(width * .77)
+    portal_x = int(width * .36)
     portal_w = int(width * .23)
     portal_top = ground_y + 12
     portal_rect = pygame.Rect(portal_x, portal_top, portal_w, height - portal_top)
@@ -93,7 +93,7 @@ def draw_depot(surface, train, route_set, elapsed, renderer=None):
     _draw_track(surface, rail_y, portal_x, width)
 
     progress = max(0.0, min(1.0, train.position / 720.0))
-    train_front_x = int(width * .10 + progress * width * .69)
+    train_front_x = int(width * .10 + progress * width * .26)
     _draw_train(surface, train, renderer, train_front_x, rail_y)
 
     # Blue/white shunting signal at the portal approach.

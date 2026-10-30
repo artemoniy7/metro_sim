@@ -182,7 +182,7 @@ class Renderer:
         return (0.45 * math.sin(world_x / 85.0)
                 + 0.18 * math.sin(world_x / 38.0 + 0.8))
 
-    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False, other_trains=None, station_simulation=None):
+    def draw_scene(self, surface, line, train, camera, elapsed, doors_open=False, door_closing=False, other_trains=None, station_simulation=None, depot_mode=False, depot_route_set=False):
         width, height = surface.get_size()
         if self.last_render_time is None:
             frame_dt = 1.0 / 60.0
@@ -229,7 +229,29 @@ class Renderer:
             return round(base_track_y + (depth_m - 10.0) * 1.35
                          - self._track_offset(world_x) * scale * offset_weight)
 
+        depot_length = float(getattr(line, "depot_length", 0.0))
+        ground_y = int(height * 0.58)
         pygame.draw.rect(surface, (25, 30, 39), (0, 0, width, height))
+        if depot_mode:
+            # Surface depot scenery is drawn in world coordinates; it scrolls
+            # under the exact same camera as the tunnel and station platforms.
+            pygame.draw.rect(surface, (112, 164, 194), (0, 0, width, ground_y))
+            pygame.draw.rect(surface, (79, 101, 70), (0, ground_y, width, height - ground_y))
+            for tree_world in range(35, int(depot_length), 55):
+                sx = round((line.path.total_length - tree_world - camera_x) * scale)
+                if -60 < sx < width + 60:
+                    pygame.draw.rect(surface, (79, 74, 58), (sx - 4, ground_y - 42, 8, 42))
+                    pygame.draw.circle(surface, (58, 99, 68), (sx, ground_y - 52), 25)
+            shed_world = 95.0
+            shed_x = round((line.path.total_length - shed_world - camera_x) * scale)
+            shed_w = round(125.0 * scale)
+            if -shed_w < shed_x < width:
+                pygame.draw.rect(surface, (137, 151, 157),
+                                 (shed_x, ground_y - 125, shed_w, 125))
+                pygame.draw.rect(surface, (65, 79, 88),
+                                 (shed_x, ground_y - 125, shed_w, 125), 3)
+                pygame.draw.rect(surface, (43, 53, 61),
+                                 (shed_x + 12, ground_y - 83, shed_w - 24, 83))
         tunnel_height = max(1, round(5.5 * scale))
         if self.tunnel_image is not None:
             tunnel_width = max(1, round(tunnel_height * self.tunnel_image.get_width() / self.tunnel_image.get_height()))
@@ -247,7 +269,13 @@ class Renderer:
                     if abs(route_position - float(station.get("position", 0)))
                     <= float(station.get("length_m", 162)) / 2
                 ), None)
-                if station_index is not None:
+                if depot_mode and route_position < depot_length:
+                    pygame.draw.rect(surface, (112, 164, 194), (sx, 0, strip_width, ground_y))
+                    pygame.draw.rect(surface, (79, 101, 70),
+                                     (sx, ground_y, strip_width, max(1, track_y - ground_y)))
+                    pygame.draw.rect(surface, (70, 64, 56),
+                                     (sx, track_y - 4, strip_width, 18))
+                elif station_index is not None:
                     station_height = max(1, round(8.5 * scale))
                     station_bottom_extra = max(1, round(0.25 * scale))
                     station_texture = self.station_images.get(
@@ -298,7 +326,11 @@ class Renderer:
         else:
             for sx in range(0, width, 4):
                 route_position = line.path.total_length - (camera_x + sx / scale)
-                if any(abs(route_position - float(station.get("position", 0))) <= float(station.get("length_m", 155)) / 2 for station in line.stations):
+                if depot_mode and route_position < depot_length:
+                    track_y = rail_y_at(sx)
+                    pygame.draw.rect(surface, (112, 164, 194), (sx, 0, 4, ground_y))
+                    pygame.draw.rect(surface, (79, 101, 70), (sx, ground_y, 4, max(1, track_y-ground_y)))
+                elif any(abs(route_position - float(station.get("position", 0))) <= float(station.get("length_m", 155)) / 2 for station in line.stations):
                     track_y = rail_y_at(sx)
                     pygame.draw.rect(surface, (142, 24, 34), (sx, track_y - tunnel_height, 4, tunnel_height + 20))
 
@@ -469,6 +501,20 @@ class Renderer:
                 surface.blit(bot_label, (round(bot_x), max(220, round(rail_y_at(bot_x) - 68))))
 
         speed_limit_kmh = train.als.speed_limit(line, train.position, train.max_speed) * 3.6
+        if depot_mode:
+            # A shunting signal is fixed in the depot world, so it moves with
+            # the camera rather than being painted as a screen-space icon.
+            signal_world = depot_length - 42.0
+            signal_x = round((line.path.total_length - signal_world - camera_x) * scale)
+            signal_y = round(base_track_y - 100)
+            if -30 < signal_x < width + 30:
+                pygame.draw.line(surface, (80, 84, 91), (signal_x, signal_y + 24),
+                                 (signal_x, base_track_y + 2), 4)
+                pygame.draw.rect(surface, (19, 22, 27),
+                                 (signal_x - 11, signal_y, 22, 48), border_radius=4)
+                lamp = (235, 240, 245) if depot_route_set else (45, 105, 255)
+                pygame.draw.circle(surface, lamp, (signal_x, signal_y + 13), 7)
+                pygame.draw.circle(surface, (48, 51, 58), (signal_x, signal_y + 34), 6)
         pygame.draw.rect(surface, (12, 15, 20), (16, 16, 455, 245), border_radius=8)
         surface.blit(self.font.render("81-760 «Ока»", True, (240, 240, 240)), (30, 25))
         surface.blit(self.font.render(f"Скорость: {train.speed * 3.6:05.1f} км/ч", True, (110, 220, 160)), (30, 56))
@@ -489,7 +535,15 @@ class Renderer:
         else:
             next_text = "Конечная станция"
         surface.blit(self.small_font.render(next_text, True, (230, 150, 155)), (465, 25))
-        surface.blit(self.small_font.render("A/← тормоз   D/→ тяга   SPACE экстр. тормоз", True, (205, 210, 218)), (30, 173))
+        controls_text = ("R маршрут   A/← тормоз   D/→ тяга   колесо мыши — масштаб   ←/→ — обзор"
+                         if depot_mode else
+                         "A/← тормоз   D/→ тяга   SPACE экстр. тормоз   колесо — масштаб")
+        surface.blit(self.small_font.render(controls_text, True, (205, 210, 218)), (30, 173))
+        if depot_mode:
+            status = "МАНЕВРОВЫЙ МАРШРУТ ОТКРЫТ" if depot_route_set else "МАНЕВРОВЫЙ МАРШРУТ ЗАКРЫТ — R"
+            surface.blit(self.small_font.render(status, True,
+                                                (235, 240, 245) if depot_route_set else (100, 160, 255)),
+                         (30, 250))
         if station_simulation is not None:
             surface.blit(self.font.render(f"Время: {station_simulation.clock_text}", True, (245, 245, 245)), (30, 198))
             surface.blit(self.small_font.render(station_simulation.period_text, True,

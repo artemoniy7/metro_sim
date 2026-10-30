@@ -249,44 +249,25 @@ class MainMenu:
         self._text(surface, end.get("name", ""), self.button_font, self.TEXT, (int(w*.34), 340))
         self._button(surface, "end_prev", "‹", pygame.Rect(int(w*.34), 371, 42, 34))
         self._button(surface, "end_next", "›", pygame.Rect(int(w*.34)+50, 371, 42, 34))
-        # Draw this line's own station geography (coordinates when available).
-        # If coordinates are absent, fall back to a line-specific station sequence.
-        map_rect = pygame.Rect(int(w*.055), 420, int(w*.89), 82)
-        pygame.draw.rect(surface, (19, 26, 35), map_rect, border_radius=9)
+        # Simple route strip, as in the original setup screen.
+        map_rect = pygame.Rect(int(w*.055), 425, int(w*.89), 56)
+        pygame.draw.rect(surface, (19, 26, 35), map_rect, border_radius=8)
         color = tuple(meta.get("color", [214, 8, 59]))
-        coords = [(st.get("longitude"), st.get("latitude")) for st in stations]
-        has_coords = all(lon is not None and lat is not None for lon, lat in coords)
-        if has_coords:
-            xs = [float(p[0]) for p in coords]
-            ys = [float(p[1]) for p in coords]
-            min_x, max_x = min(xs), max(xs)
-            min_y, max_y = min(ys), max(ys)
-            span_x, span_y = max(max_x-min_x, 0.00001), max(max_y-min_y, 0.00001)
-            pad_x, pad_y = 22, 17
-            usable_w, usable_h = map_rect.width-2*pad_x, map_rect.height-2*pad_y
-            raw = [(map_rect.x+pad_x+(x-min_x)/span_x*usable_w,
-                    map_rect.y+pad_y+(max_y-y)/span_y*usable_h) for x,y in zip(xs,ys)]
-        else:
-            raw = [(map_rect.x+18+i*(map_rect.width-36)/max(1,len(stations)-1),
-                    map_rect.centery + (12 if i % 2 else -12)) for i in range(len(stations))]
-        route_points = [(int(x), int(y)) for x,y in raw]
-        if len(route_points) > 1:
-            pygame.draw.lines(surface, (75, 88, 103), False, route_points, 7)
-            pygame.draw.lines(surface, color, False, route_points, 4)
-        for i, (px, py) in enumerate(route_points):
+        left, right = map_rect.x+18, map_rect.right-18
+        cy = map_rect.centery
+        pygame.draw.line(surface, color, (left, cy), (right, cy), 5)
+        for i, station in enumerate(stations):
+            px = left + int((right-left) * i / max(1, len(stations)-1))
             active = self.start_index <= i <= self.end_index
-            node_color = color if active else (88, 101, 116)
-            pygame.draw.circle(surface, node_color, (px,py), 6 if active else 4)
+            pygame.draw.circle(surface, color if active else (83, 94, 108),
+                               (px, cy), 5 if active else 3)
             if i in (self.start_index, self.end_index):
-                pygame.draw.circle(surface, self.TEXT, (px,py), 10, 2)
-            # All stations can be selected directly on the route.
-            hit = pygame.Rect(px-10, py-10, 20, 20)
-            self._add_button(f"station_{i}", hit)
-            if i in (0, len(stations)-1, self.start_index, self.end_index) or i % max(1, len(stations)//8) == 0:
-                label = self.small.render(stations[i].get("name", ""), True, self.TEXT if active else self.MUTED)
-                label_x = max(map_rect.x+3, min(px-label.get_width()//2, map_rect.right-label.get_width()-3))
-                label_y = map_rect.bottom-19 if py < map_rect.centery else map_rect.y+2
-                surface.blit(label, (label_x, label_y))
+                pygame.draw.circle(surface, self.TEXT, (px, cy), 9, 2)
+            self._add_button(f"station_{i}", pygame.Rect(px-10, cy-10, 20, 20))
+            if i in (0, len(stations)-1, self.start_index, self.end_index):
+                label = self.small.render(station.get("name", ""), True, self.TEXT)
+                surface.blit(label, (max(map_rect.x, min(px-label.get_width()//2,
+                             map_rect.right-label.get_width())), map_rect.y+4))
         self._text(surface, f'{len(stations)} станций  •  нажми на точку, чтобы выбрать станцию',
                    self.small, self.MUTED, (map_rect.x+8, map_rect.bottom+4))
         self._text(surface, "3. Выбери поезд", self.body, self.MUTED, (int(w*.055), 505))

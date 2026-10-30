@@ -47,7 +47,9 @@ class Game:
             self.train.max_speed = min(self.line_max_speed, 15.0 / 3.6)
         self.end_position = float(end_position) if end_position is not None else self.line.path.total_length
         # Close view of the locomotive, with mouse-wheel zoom and consist panning.
-        self.camera = Camera(WINDOW_SIZE, zoom=2.8)
+        display_surface = pygame.display.get_surface()
+        viewport_size = display_surface.get_size() if display_surface else WINDOW_SIZE
+        self.camera = Camera(viewport_size, zoom=2.8)
         self.elapsed = 0.0
         self.doors_open = False
         # The player's initial position is reserved; AI trains enter every
@@ -232,6 +234,13 @@ class Game:
             update_announcer(self.train, dt)
 
     def render(self, surface):
+        # The game window is borderless fullscreen; keep camera geometry in
+        # sync with the actual render target rather than the menu's design size.
+        viewport_size = surface.get_size()
+        if (self.camera.width, self.camera.height) != viewport_size:
+            self.camera.width, self.camera.height = viewport_size
+            self.camera.focus_screen_x = viewport_size[0] * 0.36
+            self.camera.follow(self.train, self.line.path.total_length)
         surface.fill(BACKGROUND_COLOR)
         self.renderer.draw_scene(
             surface, self.line, self.train, self.camera, self.elapsed,

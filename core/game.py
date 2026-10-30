@@ -27,6 +27,8 @@ class Game:
         if self.depot_mode:
             self.line_data = self._make_depot_departure_route(self.line_data, self.depot_length)
         self.line = Line(self.line_data)
+        # The depot is part of the same world route and uses the normal camera.
+        self.line.depot_length = self.depot_length if self.depot_mode else 0.0
         self.renderer.configure_line_station_sprites(line_id)
         configure_station_joints = getattr(self.audio, "configure_station_joint_sounds", None)
         if callable(configure_station_joints):
@@ -231,16 +233,14 @@ class Game:
 
     def render(self, surface):
         surface.fill(BACKGROUND_COLOR)
-        if self.depot_mode:
-            from systems.depot_view import draw_depot
-            draw_depot(surface, self.train, self.depot_route_set, self.elapsed, self.renderer)
-            return
         self.renderer.draw_scene(
             surface, self.line, self.train, self.camera, self.elapsed,
             doors_open=self.doors_open,
             door_closing=getattr(self.audio, "door_ring_active", False),
             other_trains=[bot.train for bot in self.bot_trains],
             station_simulation=self.station_simulation,
+            depot_mode=self.depot_mode,
+            depot_route_set=self.depot_route_set,
         )
         if not self.doors_open and self.renderer.door_open_amount <= 0.0:
             stop_door_ring = getattr(self.audio, "stop_door_ring", None)
